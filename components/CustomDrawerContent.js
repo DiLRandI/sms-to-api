@@ -16,6 +16,11 @@ const CustomDrawerContent = ({ navigation, state }) => {
       icon: 'chatbubbles-outline',
     },
     {
+      name: 'Contact Filters',
+      routeName: 'Filters',
+      icon: 'filter-outline',
+    },
+    {
       name: 'Settings',
       routeName: 'Settings',
       icon: 'settings-outline',

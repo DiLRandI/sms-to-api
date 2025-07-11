@@ -2,6 +2,7 @@ import { Platform, PermissionsAndroid, Alert } from 'react-native';
 import SmsListener from 'react-native-android-sms-listener';
 import ApiService from './ApiService';
 import StorageService from './StorageService';
+import ContactFilterService from './ContactFilterService';
 
 /**
  * SMS Service for handling incoming SMS messages on Android
@@ -169,6 +170,15 @@ export class SmsService {
         timestamp: new Date().toISOString(),
       });
 
+      // Check if this number should be forwarded based on user filters
+      const shouldForward = await ContactFilterService.shouldForwardSms(message.originatingAddress);
+      
+      if (!shouldForward) {
+        console.log(`SMS from ${message.originatingAddress} blocked by user filter`);
+        this.showFilteredNotification(message.originatingAddress);
+        return;
+      }
+
       // Prepare SMS data for API
       const smsData = {
         from: message.originatingAddress,
@@ -222,6 +232,14 @@ export class SmsService {
   static showSuccessNotification(smsData) {
     // For production, you might want to use a toast notification instead
     console.log(`✅ SMS from ${smsData.from} forwarded to API`);
+  }
+
+  /**
+   * Show filtered notification
+   * @param {string} phoneNumber - Phone number that was filtered
+   */
+  static showFilteredNotification(phoneNumber) {
+    console.log(`🚫 SMS from ${phoneNumber} filtered (not forwarded)`);
   }
 
   /**

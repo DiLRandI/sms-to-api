@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from './screens/HomeScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import SmsScreen from './screens/SmsScreen';
+import ContactFilterScreen from './screens/ContactFilterScreen';
 
 // Import custom drawer content
 import CustomDrawerContent from './components/CustomDrawerContent';
@@ -57,6 +58,13 @@ export default function App() {
           component={SmsScreen}
           options={{
             headerTitle: 'SMS Listener',
+          }}
+        />
+        <Drawer.Screen 
+          name="Filters" 
+          component={ContactFilterScreen}
+          options={{
+            headerTitle: 'Contact Filters',
           }}
         />
         <Drawer.Screen 

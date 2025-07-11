@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import useApiSettings from '../hooks/useApiSettings';
 import SmsService from '../services/SmsService';
+import ContactFilterService from '../services/ContactFilterService';
 
 const HomeScreen = () => {
   const navigation = useNavigation();
@@ -12,6 +13,12 @@ const HomeScreen = () => {
     isListening: false,
     hasPermission: false,
     ready: false,
+  });
+  const [filterStatus, setFilterStatus] = useState({
+    filterMode: 'all',
+    isActive: false,
+    allowedCount: 0,
+    blockedCount: 0,
   });
 
   // Check SMS status when screen is focused
@@ -23,8 +30,13 @@ const HomeScreen = () => {
 
   const checkSmsStatus = async () => {
     try {
-      const status = await SmsService.testSmsSetup();
-      setSmsStatus(status);
+      const [smsStatusResult, filterSummary] = await Promise.all([
+        SmsService.testSmsSetup(),
+        ContactFilterService.getFilterSummary(),
+      ]);
+      
+      setSmsStatus(smsStatusResult);
+      setFilterStatus(filterSummary);
     } catch (error) {
       console.error('Error checking SMS status:', error);
     }
@@ -36,6 +48,10 @@ const HomeScreen = () => {
 
   const navigateToSms = () => {
     navigation.navigate('SMS');
+  };
+
+  const navigateToFilters = () => {
+    navigation.navigate('Filters');
   };
 
   return (
@@ -105,6 +121,44 @@ const HomeScreen = () => {
             <TouchableOpacity style={styles.configureButton} onPress={navigateToSms}>
               <Ionicons name="radio" size={20} color="#fff" />
               <Text style={styles.configureButtonText}>Start SMS Listener</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
+      {/* Contact Filter Status */}
+      <View style={styles.statusContainer}>
+        <View style={styles.statusHeader}>
+          <Ionicons 
+            name={filterStatus.isActive ? "filter" : "filter-outline"} 
+            size={24} 
+            color={filterStatus.isActive ? "#FF9500" : "#666"} 
+          />
+          <Text style={styles.statusTitle}>
+            Contact Filters {filterStatus.isActive ? "Active" : "Disabled"}
+          </Text>
+        </View>
+        
+        {filterStatus.isActive ? (
+          <View>
+            <Text style={styles.statusText}>
+              📋 Mode: {filterStatus.filterMode.charAt(0).toUpperCase() + filterStatus.filterMode.slice(1)}
+            </Text>
+            {filterStatus.filterMode === 'whitelist' && (
+              <Text style={styles.statusText}>✅ {filterStatus.allowedCount} allowed numbers</Text>
+            )}
+            {filterStatus.filterMode === 'blacklist' && (
+              <Text style={styles.statusText}>🚫 {filterStatus.blockedCount} blocked numbers</Text>
+            )}
+          </View>
+        ) : (
+          <View>
+            <Text style={styles.statusText}>
+              All incoming SMS will be forwarded to your API endpoint.
+            </Text>
+            <TouchableOpacity style={styles.configureButton} onPress={navigateToFilters}>
+              <Ionicons name="filter" size={20} color="#fff" />
+              <Text style={styles.configureButtonText}>Configure Filters</Text>
             </TouchableOpacity>
           </View>
         )}
