@@ -18,6 +18,7 @@ import CustomDrawerContent from './components/CustomDrawerContent';
 // Import logging service and background service manager
 import LoggingService, { LOG_LEVELS, LOG_CATEGORIES } from './services/LoggingService';
 import BackgroundServiceManager from './services/BackgroundServiceManager';
+import SmsService from './services/SmsService';
 
 const Drawer = createDrawerNavigator();
 
@@ -38,6 +39,16 @@ export default function App() {
           await LoggingService.success(LOG_CATEGORIES.SYSTEM, 'Background SMS processing services initialized successfully');
         } else {
           await LoggingService.warn(LOG_CATEGORIES.SYSTEM, 'Background SMS processing services failed to initialize');
+        }
+        
+        // Initialize SMS service and restore previous state
+        await LoggingService.info(LOG_CATEGORIES.SYSTEM, 'Initializing SMS service and restoring previous state');
+        const smsInitialized = await SmsService.initialize();
+        
+        if (smsInitialized) {
+          await LoggingService.success(LOG_CATEGORIES.SYSTEM, 'SMS service initialized successfully');
+        } else {
+          await LoggingService.warn(LOG_CATEGORIES.SYSTEM, 'SMS service initialization had issues');
         }
         
       } catch (error) {

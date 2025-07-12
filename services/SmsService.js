@@ -1,4 +1,5 @@
 import { Platform, PermissionsAndroid, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import SmsListener from 'react-native-android-sms-listener';
 import ApiService from './ApiService';
 import StorageService from './StorageService';
@@ -13,6 +14,70 @@ import BackgroundServiceManager from './BackgroundServiceManager';
 export class SmsService {
   static subscription = null;
   static isListening = false;
+  static STORAGE_KEY = '@sms_to_api:sms_listener_state';
+
+  /**
+   * Initialize SMS service and restore previous state
+   */
+  static async initialize() {
+    try {
+      await LoggingService.info(LOG_CATEGORIES.SMS, 'Initializing SMS service');
+      
+      // Check if SMS listener was previously active
+      const savedState = await AsyncStorage.getItem(this.STORAGE_KEY);
+      const wasListening = savedState ? JSON.parse(savedState).isListening : false;
+      
+      if (wasListening) {
+        await LoggingService.info(LOG_CATEGORIES.SMS, 'SMS listener was previously active, attempting to restore');
+        
+        // Check if we still have permissions and API config
+        const hasPermission = await this.checkSmsPermissions();
+        const apiSettings = await StorageService.getApiSettings();
+        const hasApiConfig = !!(apiSettings.endpoint && apiSettings.apiKey);
+        
+        if (hasPermission && hasApiConfig) {
+          // Restore the SMS listener
+          const restored = await this.startListening(true); // true = silent restore
+          
+          if (restored) {
+            await LoggingService.success(LOG_CATEGORIES.SMS, 'SMS listener restored successfully on app start');
+          } else {
+            await LoggingService.warn(LOG_CATEGORIES.SMS, 'Failed to restore SMS listener on app start');
+          }
+        } else {
+          await LoggingService.warn(LOG_CATEGORIES.SMS, 'Cannot restore SMS listener: missing permissions or API config', {
+            hasPermission,
+            hasApiConfig
+          });
+          // Clear the saved state since we can't restore
+          await this.saveListenerState(false);
+        }
+      } else {
+        await LoggingService.debug(LOG_CATEGORIES.SMS, 'SMS listener was not previously active');
+      }
+      
+      return true;
+    } catch (error) {
+      await LoggingService.error(LOG_CATEGORIES.SMS, 'Failed to initialize SMS service', { error: error.message });
+      return false;
+    }
+  }
+
+  /**
+   * Save SMS listener state to persistent storage
+   */
+  static async saveListenerState(isListening) {
+    try {
+      const state = {
+        isListening,
+        timestamp: new Date().toISOString(),
+      };
+      await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(state));
+      await LoggingService.debug(LOG_CATEGORIES.STORAGE, 'SMS listener state saved', state);
+    } catch (error) {
+      await LoggingService.error(LOG_CATEGORIES.STORAGE, 'Failed to save SMS listener state', { error: error.message });
+    }
+  }
 
   /**
    * Request SMS permissions from user
@@ -84,24 +149,33 @@ export class SmsService {
 
   /**
    * Start listening for incoming SMS messages
+   * @param {boolean} silentRestore - If true, don't show alerts (for automatic restore)
    * @returns {Promise<boolean>} Success status
    */
-  static async startListening() {
+  static async startListening(silentRestore = false) {
     try {
-      await LoggingService.info(LOG_CATEGORIES.SMS, 'Attempting to start SMS listener');
+      if (!silentRestore) {
+        await LoggingService.info(LOG_CATEGORIES.SMS, 'Attempting to start SMS listener');
+      } else {
+        await LoggingService.info(LOG_CATEGORIES.SMS, 'Attempting to restore SMS listener silently');
+      }
 
       // Check platform
       if (Platform.OS !== 'android') {
         const errorMsg = 'SMS listening is only available on Android devices';
         await LoggingService.error(LOG_CATEGORIES.SMS, errorMsg);
-        Alert.alert('Platform Error', errorMsg);
+        if (!silentRestore) {
+          Alert.alert('Platform Error', errorMsg);
+        }
         return false;
       }
 
       // Check if already listening
       if (this.isListening) {
         await LoggingService.warn(LOG_CATEGORIES.SMS, 'SMS listener start requested but already active');
-        console.log('SMS listener is already active');
+        if (!silentRestore) {
+          console.log('SMS listener is already active');
+        }
         return true;
       }
 
@@ -109,9 +183,14 @@ export class SmsService {
       const hasPermission = await this.checkSmsPermissions();
       if (!hasPermission) {
         await LoggingService.warn(LOG_CATEGORIES.SMS, 'SMS permissions not granted, requesting permissions');
-        const granted = await this.requestSmsPermissions();
-        if (!granted) {
-          await LoggingService.error(LOG_CATEGORIES.SMS, 'SMS listener failed to start: permissions denied');
+        if (!silentRestore) {
+          const granted = await this.requestSmsPermissions();
+          if (!granted) {
+            await LoggingService.error(LOG_CATEGORIES.SMS, 'SMS listener failed to start: permissions denied');
+            return false;
+          }
+        } else {
+          await LoggingService.error(LOG_CATEGORIES.SMS, 'SMS listener restore failed: permissions not granted');
           return false;
         }
       }
@@ -124,10 +203,12 @@ export class SmsService {
           hasEndpoint: !!apiSettings.endpoint, 
           hasApiKey: !!apiSettings.apiKey 
         });
-        Alert.alert(
-          'Configuration Required',
-          'Please configure your API endpoint and key in Settings before starting SMS listening.'
-        );
+        if (!silentRestore) {
+          Alert.alert(
+            'Configuration Required',
+            'Please configure your API endpoint and key in Settings before starting SMS listening.'
+          );
+        }
         return false;
       }
 
@@ -145,22 +226,32 @@ export class SmsService {
       });
 
       this.isListening = true;
-      await LoggingService.success(LOG_CATEGORIES.SMS, 'SMS listener started successfully with background support', {
-        backgroundServiceEnabled: backgroundInitialized
-      });
-      console.log('SMS listener started successfully');
       
-      Alert.alert(
-        'SMS Listener Active',
-        `Now listening for incoming SMS messages. They will be forwarded to your configured API endpoint.${backgroundInitialized ? '\n\n✅ Background processing enabled - SMS will be processed even when app is closed.' : '\n\n⚠️ Background processing not available - SMS will only be processed when app is active.'}`,
-        [{ text: 'OK', style: 'default' }]
-      );
+      // Save the listening state
+      await this.saveListenerState(true);
+      
+      await LoggingService.success(LOG_CATEGORIES.SMS, 'SMS listener started successfully with background support', {
+        backgroundServiceEnabled: backgroundInitialized,
+        silentRestore
+      });
+      
+      if (!silentRestore) {
+        console.log('SMS listener started successfully');
+        
+        Alert.alert(
+          'SMS Listener Active',
+          `Now listening for incoming SMS messages. They will be forwarded to your configured API endpoint.${backgroundInitialized ? '\n\n✅ Background processing enabled - SMS will be processed even when app is closed.' : '\n\n⚠️ Background processing not available - SMS will only be processed when app is active.'}`,
+          [{ text: 'OK', style: 'default' }]
+        );
+      }
 
       return true;
     } catch (error) {
-      await LoggingService.error(LOG_CATEGORIES.SMS, 'Failed to start SMS listener', { error: error.message });
-      console.error('Error starting SMS listener:', error);
-      Alert.alert('Error', 'Failed to start SMS listener: ' + error.message);
+      await LoggingService.error(LOG_CATEGORIES.SMS, 'Failed to start SMS listener', { error: error.message, silentRestore });
+      if (!silentRestore) {
+        console.error('Error starting SMS listener:', error);
+        Alert.alert('Error', 'Failed to start SMS listener: ' + error.message);
+      }
       return false;
     }
   }
@@ -179,6 +270,10 @@ export class SmsService {
       }
       
       this.isListening = false;
+      
+      // Save the stopped state
+      await this.saveListenerState(false);
+      
       await LoggingService.success(LOG_CATEGORIES.SMS, 'SMS listener stopped successfully');
       console.log('SMS listener stopped');
       
