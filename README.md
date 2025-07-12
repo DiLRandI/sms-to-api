@@ -20,6 +20,7 @@ A professional React Native application that listens for incoming SMS messages o
 ## 🔧 Setup Instructions
 
 ### Prerequisites
+
 - React Native development environment
 - Android device or emulator
 - Expo CLI
@@ -28,16 +29,19 @@ A professional React Native application that listens for incoming SMS messages o
 
 1. Clone the repository
 2. Install dependencies:
+
    ```bash
    npm install
    ```
 
 3. Start the development server:
+
    ```bash
    npm start
    ```
 
 4. Run on Android device:
+
    ```bash
    npm run android
    ```
@@ -45,6 +49,7 @@ A professional React Native application that listens for incoming SMS messages o
 ## 🔐 Permissions Required
 
 The app requires the following Android permissions:
+
 - `RECEIVE_SMS`: To listen for incoming SMS messages
 - `READ_SMS`: To read SMS message content
 
@@ -53,12 +58,14 @@ These permissions are requested at runtime when you first try to activate SMS li
 ## ⚙️ Configuration
 
 ### API Settings
+
 1. Navigate to **Settings** screen
 2. Enter your **API Endpoint** (full URL where SMS will be forwarded)
 3. Enter your **API Key** for authentication
 4. Tap **Save Settings**
 
 ### SMS Listener
+
 1. Navigate to **SMS Listener** screen
 2. Grant SMS permissions when prompted
 3. Toggle the SMS listener switch to start/stop listening
@@ -90,6 +97,7 @@ When an SMS is received, the app will send a POST request to your configured end
 ```
 
 ### Headers
+
 - `Content-Type: application/json`
 - `Authorization: Bearer YOUR_API_KEY`
 - `User-Agent: SMS-to-API-App/1.0.0`
@@ -97,12 +105,14 @@ When an SMS is received, the app will send a POST request to your configured end
 ## 🛠 Technical Implementation
 
 ### Architecture
+
 - **Service Layer**: `SmsService` for SMS handling, `StorageService` for data persistence, `ApiService` for API communication
 - **Custom Hooks**: `useApiSettings` for state management
 - **Navigation**: React Navigation with drawer navigation
 - **Storage**: AsyncStorage for secure local data persistence
 
 ### Key Components
+
 - `SmsService`: Handles SMS permissions, listening, and forwarding
 - `StorageService`: Manages secure local storage of API settings
 - `ApiService`: Handles API communication and validation
@@ -136,7 +146,9 @@ When an SMS is received, the app will send a POST request to your configured end
    - Review console logs for error messages
 
 ### Testing Configuration
+
 Use the "Test Configuration" button in the SMS Listener screen to verify:
+
 - SMS permissions status
 - API configuration completeness
 - SMS listener status
@@ -145,6 +157,7 @@ Use the "Test Configuration" button in the SMS Listener screen to verify:
 ## 📝 Development
 
 ### Project Structure
+
 ```
 ├── components/
 │   └── CustomDrawerContent.js
@@ -162,8 +175,10 @@ Use the "Test Configuration" button in the SMS Listener screen to verify:
 ```
 
 ### Building for Production
+
 1. Configure your app signing
 2. Build APK/AAB:
+
    ```bash
    expo build:android
    ```

@@ -24,13 +24,20 @@
       "permissions": [
         "RECEIVE_SMS",
         "READ_SMS"
-      ]
+      ],
+      "package": "com.github.com.dilrandi.smstoapi"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "f97bb453-1874-4d53-b314-ee285c5b7a65"
+      }
+    },
+    "owner": "deleema1"
   }
 }
