@@ -19,7 +19,7 @@ export class ApiService {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
-          'User-Agent': 'SMS-to-API-App/1.1.1',
+          'User-Agent': 'SMS-to-API-App/1.2.0',
         },
         timeout: 10000, // 10 second timeout
       });
@@ -83,7 +83,7 @@ export class ApiService {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
-          'User-Agent': 'SMS-to-API-App/1.1.1',
+          'User-Agent': 'SMS-to-API-App/1.2.0',
         },
         body: JSON.stringify(payload),
         timeout: 15000, // 15 second timeout

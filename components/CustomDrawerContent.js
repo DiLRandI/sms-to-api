@@ -41,7 +41,7 @@ const CustomDrawerContent = ({ navigation, state }) => {
     <DrawerContentScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.appName}>SMS to API</Text>
-        <Text style={styles.appVersion}>v1.1.1</Text>
+        <Text style={styles.appVersion}>v1.2.0</Text>
       </View>
       
       <View style={styles.menuItems}>

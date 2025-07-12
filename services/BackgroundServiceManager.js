@@ -235,12 +235,11 @@ export class BackgroundServiceManager {
 
       if (smsIndex >= 0) {
         queue[smsIndex].processed = true;
-        queue[smsIndex].processedInForeground = true;
         
         // Save updated queue
         await AsyncStorage.setItem(SMS_QUEUE_KEY, JSON.stringify(queue));
         
-        await LoggingService.debug(LOG_CATEGORIES.SMS, 'SMS marked as processed (foreground)', {
+        await LoggingService.debug(LOG_CATEGORIES.SMS, 'SMS marked as processed', {
           smsId: queue[smsIndex].id,
           from: message.originatingAddress
         });
@@ -308,7 +307,7 @@ export class BackgroundServiceManager {
             messageId: sms.id,
             deviceInfo: {
               platform: Platform.OS,
-              appVersion: '1.1.1',
+              appVersion: '1.2.0',
               processedInBackground: true,
             },
           };
