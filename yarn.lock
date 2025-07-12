@@ -1414,7 +1414,7 @@
   dependencies:
     joi "^17.2.1"
 
-"@react-native-community/cli@*", "@react-native-community/cli@latest":
+"@react-native-community/cli@*":
   version "19.1.0"
   resolved "https://registry.npmjs.org/@react-native-community/cli/-/cli-19.1.0.tgz"
   integrity sha512-L9GL4YtgvoaS7DXcBuHZ1WtH+D2wV6G33THpxVmBEaJQp/vgRQg9Z4bb+9Mj/rBcATgbUu4Sd7H3xJE2qCd93w==
@@ -2832,11 +2832,6 @@ expo-modules-core@2.4.2:
   integrity sha512-RCb0wniYCJkxwpXrkiBA/WiNGxzYsEpL0sB50gTnS/zEfX3DImS2npc4lfZ3hPZo1UF9YC6OSI9Do+iacV0NUg==
   dependencies:
     invariant "^2.2.4"
-
-expo-permissions@^14.4.0:
-  version "14.4.0"
-  resolved "https://registry.npmjs.org/expo-permissions/-/expo-permissions-14.4.0.tgz"
-  integrity sha512-oAcnJ7dlZhpBydK73cwomA2xofizayVUz+FW5REl7dMu7MYyeN/3aqhlpZ3mYddrxvG161bqu97MQr01UixUnw==
 
 expo-status-bar@~2.2.3:
   version "2.2.3"
