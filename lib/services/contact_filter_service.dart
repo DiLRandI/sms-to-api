@@ -2,55 +2,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_sms_inbox/flutter_sms_inbox.dart';
 
 class ContactFilterService {
-  static const String _allowedContactsKey = 'allowed_contacts';
-  static const String _filterModeKey =
-      'filter_mode'; // 'whitelist' or 'blacklist'
-
-  // Get filter mode (whitelist or blacklist)
-  static Future<String> getFilterMode() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_filterModeKey) ?? 'whitelist';
-  }
-
-  // Set filter mode
-  static Future<void> setFilterMode(String mode) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_filterModeKey, mode);
-  }
-
-  // Get allowed/blocked contacts
-  static Future<List<String>> getFilteredContacts() async {
-    final prefs = await SharedPreferences.getInstance();
-    final contactsJson = prefs.getStringList(_allowedContactsKey) ?? [];
-    return contactsJson;
-  }
-
-  // Add contact to filter list
-  static Future<void> addContact(String contact) async {
-    final contacts = await getFilteredContacts();
-    if (!contacts.contains(contact)) {
-      contacts.add(contact);
-      await _saveContacts(contacts);
-    }
-  }
-
-  // Remove contact from filter list
-  static Future<void> removeContact(String contact) async {
-    final contacts = await getFilteredContacts();
-    contacts.remove(contact);
-    await _saveContacts(contacts);
-  }
-
-  // Save contacts list
-  static Future<void> _saveContacts(List<String> contacts) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(_allowedContactsKey, contacts);
-  }
-
   // Check if a contact should be forwarded
   static Future<bool> shouldForwardMessage(String sender) async {
-    final filterMode = await getFilterMode();
-    final filteredContacts = await getFilteredContacts();
+    final isUsingWhitelistMode = await isWhitelistMode();
+
+    // Get the appropriate contact list based on mode
+    final filteredContacts = isUsingWhitelistMode
+        ? await getWhitelistContacts()
+        : await getBlacklistContacts();
 
     // Normalize sender for comparison
     final normalizedSender = _normalizeContact(sender);
@@ -79,7 +38,7 @@ class ContactFilterService {
           contactWithoutPlus.contains(senderWithoutPlus);
     });
 
-    if (filterMode == 'whitelist') {
+    if (isUsingWhitelistMode) {
       // Whitelist mode: only forward if in the list
       return isInFilterList;
     } else {
@@ -116,11 +75,6 @@ class ContactFilterService {
       print('Error getting unique senders: $e');
       return [];
     }
-  }
-
-  // Clear all filtered contacts
-  static Future<void> clearAllContacts() async {
-    await _saveContacts([]);
   }
 
   // Filter mode management
