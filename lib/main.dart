@@ -1,9 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/app_state_provider.dart';
+import 'services/logging_service.dart';
 import 'screens/home_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize logging
+  await LoggingService.info(
+    'Application started',
+    'SMS to API app initialized',
+  );
+
   runApp(const MyApp());
 }
 

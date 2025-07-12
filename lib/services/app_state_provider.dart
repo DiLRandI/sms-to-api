@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 import 'sms_service.dart';
+import 'logging_service.dart';
 
 class AppStateProvider extends ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -67,6 +68,7 @@ class AppStateProvider extends ChangeNotifier {
     _apiKey = key;
 
     await _apiService.saveApiConfig(url, key);
+    await LoggingService.info('API configuration updated', 'URL: $url');
     _updateStatusMessage();
 
     setLoading(false);
@@ -75,7 +77,24 @@ class AppStateProvider extends ChangeNotifier {
   // Test API connection
   Future<bool> testApiConnection() async {
     setLoading(true);
+    await LoggingService.info(
+      'Testing API connection',
+      'Attempting to connect to configured endpoint',
+    );
     final success = await _apiService.testApiConnection();
+
+    if (success) {
+      await LoggingService.success(
+        'API connection test successful',
+        'API endpoint is reachable',
+      );
+    } else {
+      await LoggingService.error(
+        'API connection test failed',
+        'Check URL and network connectivity',
+      );
+    }
+
     setLoading(false);
     return success;
   }
@@ -84,7 +103,13 @@ class AppStateProvider extends ChangeNotifier {
   Future<void> toggleService() async {
     if (!_hasPermissions) {
       final granted = await requestPermissions();
-      if (!granted) return;
+      if (!granted) {
+        await LoggingService.error(
+          'Service toggle failed',
+          'SMS permissions not granted',
+        );
+        return;
+      }
     }
 
     setLoading(true);
@@ -92,9 +117,25 @@ class AppStateProvider extends ChangeNotifier {
     _isServiceEnabled = !_isServiceEnabled;
 
     if (_isServiceEnabled) {
+      await LoggingService.info(
+        'SMS service starting',
+        'User initiated service start',
+      );
       await SmsService.initializeSmsListener();
+      await LoggingService.success(
+        'SMS service started',
+        'Service is now monitoring for incoming SMS',
+      );
     } else {
+      await LoggingService.info(
+        'SMS service stopping',
+        'User initiated service stop',
+      );
       SmsService.stopSmsListener();
+      await LoggingService.info(
+        'SMS service stopped',
+        'Service is no longer monitoring SMS',
+      );
     }
 
     final prefs = await SharedPreferences.getInstance();

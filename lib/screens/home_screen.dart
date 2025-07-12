@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/app_state_provider.dart';
+import '../services/logging_service.dart';
 import 'config_screen.dart';
+import 'contact_filter_screen.dart';
+import 'logs_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -38,12 +41,12 @@ class HomeScreen extends StatelessWidget {
                     child: Column(
                       children: [
                         Icon(
-                          provider.isServiceEnabled 
+                          provider.isServiceEnabled
                               ? Icons.radio_button_checked
                               : Icons.radio_button_unchecked,
                           size: 48,
-                          color: provider.isServiceEnabled 
-                              ? Colors.green 
+                          color: provider.isServiceEnabled
+                              ? Colors.green
                               : Colors.grey,
                         ),
                         const SizedBox(height: 12),
@@ -65,26 +68,38 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Control Button
                 FilledButton.icon(
-                  onPressed: provider.isLoading ? null : () => _toggleService(context, provider),
+                  onPressed: provider.isLoading
+                      ? null
+                      : () => _toggleService(context, provider),
                   icon: provider.isLoading
                       ? const SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Icon(provider.isServiceEnabled ? Icons.stop : Icons.play_arrow),
-                  label: Text(provider.isServiceEnabled ? 'Stop Service' : 'Start Service'),
+                      : Icon(
+                          provider.isServiceEnabled
+                              ? Icons.stop
+                              : Icons.play_arrow,
+                        ),
+                  label: Text(
+                    provider.isServiceEnabled
+                        ? 'Stop Service'
+                        : 'Start Service',
+                  ),
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.all(16),
-                    backgroundColor: provider.isServiceEnabled ? Colors.red : Colors.green,
+                    backgroundColor: provider.isServiceEnabled
+                        ? Colors.red
+                        : Colors.green,
                   ),
                 ),
-                
+
                 const SizedBox(height: 20),
-                
+
                 // Statistics Card
                 Card(
                   child: Padding(
@@ -109,15 +124,20 @@ class HomeScreen extends StatelessWidget {
                                 ),
                                 Text(
                                   '${provider.messageCount}',
-                                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                    color: Theme.of(context).colorScheme.primary,
-                                  ),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineMedium
+                                      ?.copyWith(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
+                                      ),
                                 ),
                               ],
                             ),
                             TextButton.icon(
-                              onPressed: provider.messageCount > 0 
-                                  ? () => _resetCounter(context, provider) 
+                              onPressed: provider.messageCount > 0
+                                  ? () => _resetCounter(context, provider)
                                   : null,
                               icon: const Icon(Icons.refresh, size: 16),
                               label: const Text('Reset'),
@@ -128,9 +148,9 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 20),
-                
+
                 // Configuration Status
                 Card(
                   child: Padding(
@@ -149,7 +169,9 @@ class HomeScreen extends StatelessWidget {
                               onPressed: () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (context) => const ConfigScreen()),
+                                  MaterialPageRoute(
+                                    builder: (context) => const ConfigScreen(),
+                                  ),
                                 );
                               },
                               icon: const Icon(Icons.edit, size: 16),
@@ -162,15 +184,21 @@ class HomeScreen extends StatelessWidget {
                           context,
                           'Permissions',
                           provider.hasPermissions ? 'Granted' : 'Not Granted',
-                          provider.hasPermissions ? Icons.check_circle : Icons.error,
+                          provider.hasPermissions
+                              ? Icons.check_circle
+                              : Icons.error,
                           provider.hasPermissions ? Colors.green : Colors.red,
                         ),
                         _buildConfigItem(
                           context,
                           'API URL',
                           provider.apiUrl.isNotEmpty ? 'Configured' : 'Not Set',
-                          provider.apiUrl.isNotEmpty ? Icons.check_circle : Icons.error,
-                          provider.apiUrl.isNotEmpty ? Colors.green : Colors.red,
+                          provider.apiUrl.isNotEmpty
+                              ? Icons.check_circle
+                              : Icons.error,
+                          provider.apiUrl.isNotEmpty
+                              ? Colors.green
+                              : Colors.red,
                         ),
                         _buildConfigItem(
                           context,
@@ -183,9 +211,80 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                
+
+                const SizedBox(height: 20),
+
+                // Quick Actions
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Quick Actions',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const ContactFilterScreen(),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.filter_list),
+                                label: const Text('Contact Filter'),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.all(12),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: FutureBuilder<List<AppLog>>(
+                                future: LoggingService.getAllLogs(),
+                                builder: (context, snapshot) {
+                                  final logCount = snapshot.data?.length ?? 0;
+                                  return ElevatedButton.icon(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const LogsScreen(),
+                                        ),
+                                      );
+                                    },
+                                    icon: Badge(
+                                      isLabelVisible: logCount > 0,
+                                      label: Text('$logCount'),
+                                      child: const Icon(Icons.article),
+                                    ),
+                                    label: const Text('View Logs'),
+                                    style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.all(12),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
                 const Spacer(),
-                
+
                 // Information Footer
                 Card(
                   color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -217,7 +316,13 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildConfigItem(BuildContext context, String label, String value, IconData icon, Color color) {
+  Widget _buildConfigItem(
+    BuildContext context,
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
@@ -226,22 +331,25 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             '$label: ',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w500,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
           ),
           Text(
             value,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: color,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: color),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _toggleService(BuildContext context, AppStateProvider provider) async {
+  Future<void> _toggleService(
+    BuildContext context,
+    AppStateProvider provider,
+  ) async {
     if (!provider.hasPermissions) {
       final granted = await provider.requestPermissions();
       if (!granted) {
@@ -274,12 +382,12 @@ class HomeScreen extends StatelessWidget {
     }
 
     await provider.toggleService();
-    
+
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            provider.isServiceEnabled 
+            provider.isServiceEnabled
                 ? 'Service started - SMS forwarding enabled'
                 : 'Service stopped - SMS forwarding disabled',
           ),
@@ -294,7 +402,9 @@ class HomeScreen extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Reset Counter'),
-        content: const Text('Are you sure you want to reset the message counter?'),
+        content: const Text(
+          'Are you sure you want to reset the message counter?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),

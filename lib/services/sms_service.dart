@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter_sms_inbox/flutter_sms_inbox.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'api_service.dart';
+import 'contact_filter_service.dart';
+import 'logging_service.dart';
 
 class SmsService {
   static final SmsQuery _query = SmsQuery();
@@ -24,9 +26,17 @@ class SmsService {
   // Initialize SMS listener with polling approach
   static Future<void> initializeSmsListener() async {
     if (!await hasPermissions()) {
-      print('SMS permissions not granted');
+      await LoggingService.error(
+        'Cannot initialize SMS listener',
+        'SMS permissions not granted',
+      );
       return;
     }
+
+    await LoggingService.info(
+      'Initializing SMS listener',
+      'Using polling method',
+    );
 
     // Initialize last checked time to now
     _lastCheckedTime = DateTime.now();
@@ -36,14 +46,17 @@ class SmsService {
       _checkForNewSms();
     });
 
-    print('SMS listener initialized with polling');
+    await LoggingService.info(
+      'SMS listener initialized',
+      'Polling interval: 5 seconds',
+    );
   }
 
   // Stop SMS listener
   static void stopSmsListener() {
     _pollingTimer?.cancel();
     _pollingTimer = null;
-    print('SMS listener stopped');
+    LoggingService.info('SMS listener stopped', 'Polling stopped');
   }
 
   // Check for new SMS messages
@@ -72,31 +85,56 @@ class SmsService {
 
       _lastCheckedTime = DateTime.now();
     } catch (e) {
-      print('Error checking for new SMS: $e');
+      await LoggingService.error(
+        'Error checking for new SMS: $e',
+        'SMS polling failed',
+      );
     }
   }
 
   // Handle incoming SMS
   static Future<void> onSmsReceived(SmsMessage message) async {
-    print('New SMS received from ${message.address}: ${message.body}');
+    final sender = message.address ?? 'Unknown';
+    final messageBody = message.body ?? '';
+
+    await LoggingService.info(
+      'New SMS received from $sender',
+      'Message: $messageBody',
+    );
 
     try {
+      // Check if this contact should be forwarded
+      final shouldForward = await ContactFilterService.shouldForwardMessage(
+        sender,
+      );
+
+      if (!shouldForward) {
+        await LoggingService.info(
+          'SMS filtered out - not forwarding',
+          'Sender: $sender',
+        );
+        return;
+      }
+
       // Forward SMS to API
       final timestamp = message.date ?? DateTime.now();
 
       final success = await _apiService.forwardSms(
-        sender: message.address ?? 'Unknown',
-        message: message.body ?? '',
+        sender: sender,
+        message: messageBody,
         timestamp: timestamp,
       );
 
       if (success) {
-        print('SMS forwarded successfully');
+        await LoggingService.success(
+          'SMS forwarded successfully',
+          'To API from: $sender',
+        );
       } else {
-        print('Failed to forward SMS');
+        await LoggingService.error('Failed to forward SMS', 'Sender: $sender');
       }
     } catch (e) {
-      print('Error processing SMS: $e');
+      await LoggingService.error('Error processing SMS: $e', 'Sender: $sender');
     }
   }
 
