@@ -4,6 +4,7 @@ import ApiService from './ApiService';
 import StorageService from './StorageService';
 import ContactFilterService from './ContactFilterService';
 import LoggingService, { LOG_LEVELS, LOG_CATEGORIES } from './LoggingService';
+import BackgroundServiceManager from './BackgroundServiceManager';
 
 /**
  * SMS Service for handling incoming SMS messages on Android
@@ -130,18 +131,28 @@ export class SmsService {
         return false;
       }
 
+      // Initialize background services for reliable SMS processing
+      await LoggingService.info(LOG_CATEGORIES.SMS, 'Initializing background services for SMS processing');
+      const backgroundInitialized = await BackgroundServiceManager.initialize();
+      
+      if (!backgroundInitialized) {
+        await LoggingService.warn(LOG_CATEGORIES.SMS, 'Background services failed to initialize, continuing with foreground only');
+      }
+
       // Start listening
       this.subscription = SmsListener.addListener(message => {
         this.handleIncomingSms(message, apiSettings);
       });
 
       this.isListening = true;
-      await LoggingService.success(LOG_CATEGORIES.SMS, 'SMS listener started successfully');
+      await LoggingService.success(LOG_CATEGORIES.SMS, 'SMS listener started successfully with background support', {
+        backgroundServiceEnabled: backgroundInitialized
+      });
       console.log('SMS listener started successfully');
       
       Alert.alert(
         'SMS Listener Active',
-        'Now listening for incoming SMS messages. They will be forwarded to your configured API endpoint.',
+        `Now listening for incoming SMS messages. They will be forwarded to your configured API endpoint.${backgroundInitialized ? '\n\n✅ Background processing enabled - SMS will be processed even when app is closed.' : '\n\n⚠️ Background processing not available - SMS will only be processed when app is active.'}`,
         [{ text: 'OK', style: 'default' }]
       );
 
@@ -202,70 +213,89 @@ export class SmsService {
       await LoggingService.info(LOG_CATEGORIES.SMS, 'Incoming SMS received', smsInfo);
       console.log('Incoming SMS received:', smsInfo);
 
-      // Check if this number should be forwarded based on user filters
-      const shouldForward = await ContactFilterService.shouldForwardSms(message.originatingAddress);
+      // Always queue SMS for background processing first (ensures reliability)
+      const queued = await BackgroundServiceManager.queueSmsForProcessing(message);
       
-      if (!shouldForward) {
-        await LoggingService.warn(LOG_CATEGORIES.FILTERS, 'SMS blocked by user filter', {
-          phoneNumber: message.originatingAddress,
-          messagePreview: message.body.substring(0, 50)
-        });
-        console.log(`SMS from ${message.originatingAddress} blocked by user filter`);
-        this.showFilteredNotification(message.originatingAddress);
-        return;
+      if (!queued) {
+        await LoggingService.error(LOG_CATEGORIES.SMS, 'Failed to queue SMS for background processing');
       }
 
-      // Prepare SMS data for API
-      const smsData = {
-        from: message.originatingAddress,
-        message: message.body,
-        timestamp: new Date().toISOString(),
-        messageId: this.generateMessageId(),
-        deviceInfo: {
-          platform: Platform.OS,
-          appVersion: '1.0.1', // You could import this from package.json
-        },
-      };
+      // Also try to process immediately if app is active (for faster response)
+      try {
+        // Check if this number should be forwarded based on user filters
+        const shouldForward = await ContactFilterService.shouldForwardSms(message.originatingAddress);
+        
+        if (!shouldForward) {
+          await LoggingService.warn(LOG_CATEGORIES.FILTERS, 'SMS blocked by user filter', {
+            phoneNumber: message.originatingAddress,
+            messagePreview: message.body.substring(0, 50)
+          });
+          console.log(`SMS from ${message.originatingAddress} blocked by user filter`);
+          this.showFilteredNotification(message.originatingAddress);
+          return;
+        }
 
-      await LoggingService.debug(LOG_CATEGORIES.API, 'Forwarding SMS to API', {
-        messageId: smsData.messageId,
-        from: smsData.from,
-        endpoint: apiSettings.endpoint
-      });
+        // Prepare SMS data for API
+        const smsData = {
+          from: message.originatingAddress,
+          message: message.body,
+          timestamp: new Date().toISOString(),
+          messageId: this.generateMessageId(),
+          deviceInfo: {
+            platform: Platform.OS,
+            appVersion: '1.1.0',
+            processedInForeground: true,
+          },
+        };
 
-      // Send to API
-      const result = await ApiService.sendSms({
-        endpoint: apiSettings.endpoint,
-        apiKey: apiSettings.apiKey,
-        to: smsData.from,
-        message: smsData.message,
-        additionalData: {
-          originalMessage: smsData,
-          direction: 'incoming',
-        },
-      });
-
-      if (result.success) {
-        await LoggingService.success(LOG_CATEGORIES.API, 'SMS forwarded to API successfully', {
+        await LoggingService.debug(LOG_CATEGORIES.API, 'Forwarding SMS to API (foreground)', {
           messageId: smsData.messageId,
           from: smsData.from,
-          responseData: result.data
+          endpoint: apiSettings.endpoint
         });
-        console.log('SMS forwarded to API successfully:', result);
-        // Optionally show a subtle notification
-        this.showSuccessNotification(smsData);
-      } else {
-        await LoggingService.error(LOG_CATEGORIES.API, 'Failed to forward SMS to API', {
-          messageId: smsData.messageId,
-          from: smsData.from,
-          error: result.message,
-          statusCode: result.statusCode
+
+        // Send to API
+        const result = await ApiService.sendSms({
+          endpoint: apiSettings.endpoint,
+          apiKey: apiSettings.apiKey,
+          to: smsData.from,
+          message: smsData.message,
+          additionalData: {
+            originalMessage: smsData,
+            direction: 'incoming',
+            foregroundProcessed: true,
+          },
         });
-        console.error('Failed to forward SMS to API:', result);
-        this.showErrorNotification(result.message);
+
+        if (result.success) {
+          await LoggingService.success(LOG_CATEGORIES.API, 'SMS forwarded to API successfully (foreground)', {
+            messageId: smsData.messageId,
+            from: smsData.from,
+            responseData: result.data
+          });
+          console.log('SMS forwarded to API successfully:', result);
+          // Optionally show a subtle notification
+          this.showSuccessNotification(smsData);
+        } else {
+          await LoggingService.warn(LOG_CATEGORIES.API, 'Foreground SMS forwarding failed, background will retry', {
+            messageId: smsData.messageId,
+            from: smsData.from,
+            error: result.message,
+            statusCode: result.statusCode
+          });
+          console.error('Failed to forward SMS to API (will retry in background):', result);
+          this.showErrorNotification(`Foreground send failed: ${result.message}. Will retry in background.`);
+        }
+      } catch (foregroundError) {
+        await LoggingService.warn(LOG_CATEGORIES.SMS, 'Foreground SMS processing failed, background will handle', {
+          error: foregroundError.message,
+          phoneNumber: message?.originatingAddress
+        });
+        console.error('Foreground SMS processing failed, background will handle:', foregroundError);
       }
+
     } catch (error) {
-      await LoggingService.error(LOG_CATEGORIES.SMS, 'Error handling incoming SMS', {
+      await LoggingService.error(LOG_CATEGORIES.SMS, 'Critical error handling incoming SMS', {
         error: error.message,
         phoneNumber: message?.originatingAddress,
         messagePreview: message?.body?.substring(0, 50)

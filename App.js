@@ -10,24 +10,39 @@ import SettingsScreen from './screens/SettingsScreen';
 import SmsScreen from './screens/SmsScreen';
 import ContactFilterScreen from './screens/ContactFilterScreen';
 import LogsScreen from './screens/LogsScreen';
+import BackgroundServiceScreen from './screens/BackgroundServiceScreen';
 
 // Import custom drawer content
 import CustomDrawerContent from './components/CustomDrawerContent';
 
-// Import logging service
+// Import logging service and background service manager
 import LoggingService, { LOG_LEVELS, LOG_CATEGORIES } from './services/LoggingService';
+import BackgroundServiceManager from './services/BackgroundServiceManager';
 
 const Drawer = createDrawerNavigator();
 
 export default function App() {
-  // Initialize logging service when app starts
+  // Initialize services when app starts
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        // Initialize logging service first
         await LoggingService.initialize();
         await LoggingService.info(LOG_CATEGORIES.SYSTEM, 'SMS to API application started');
+        
+        // Initialize background services for SMS processing
+        await LoggingService.info(LOG_CATEGORIES.SYSTEM, 'Initializing background SMS processing services');
+        const backgroundInitialized = await BackgroundServiceManager.initialize();
+        
+        if (backgroundInitialized) {
+          await LoggingService.success(LOG_CATEGORIES.SYSTEM, 'Background SMS processing services initialized successfully');
+        } else {
+          await LoggingService.warn(LOG_CATEGORIES.SYSTEM, 'Background SMS processing services failed to initialize');
+        }
+        
       } catch (error) {
-        console.error('Failed to initialize logging service:', error);
+        console.error('Failed to initialize app services:', error);
+        await LoggingService.error(LOG_CATEGORIES.SYSTEM, 'Failed to initialize app services', { error: error.message });
       }
     };
 
@@ -90,6 +105,13 @@ export default function App() {
           component={LogsScreen}
           options={{
             headerTitle: 'Application Logs',
+          }}
+        />
+        <Drawer.Screen 
+          name="BackgroundService" 
+          component={BackgroundServiceScreen}
+          options={{
+            headerTitle: 'Background Service',
           }}
         />
         <Drawer.Screen 

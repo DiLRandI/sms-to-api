@@ -4,12 +4,81 @@ A professional React Native application that listens for incoming SMS messages o
 
 ## 🚀 Features
 
-- **SMS Listening**: Real-time monitoring of incoming SMS messages
-- **API Forwarding**: Automatic forwarding of SMS to your configured API endpoint
-- **Secure Storage**: Local storage of API credentials using AsyncStorage
-- **Permission Management**: Proper handling of Android SMS permissions
-- **Professional UI**: Modern, clean interface with hamburger menu navigation
-- **Status Monitoring**: Real-time status of SMS listener and API configuration
+- **S## 🔄 Background SMS Processing
+
+The app includes a robust background service that ensures SMS messages are processed even when the app is closed or in the background.
+
+### Key Features
+
+- **Reliable Processing**: SMS are queued and processed automatically, even when the app is not active
+- **Retry Logic**: Failed SMS forwarding attempts are retried up to 3 times
+- **Persistent Queue**: SMS queue survives app restarts and device reboots
+- **Battery Optimized**: Designed to work efficiently with Android's battery optimization
+- **Real-time Notifications**: Get notified about SMS processing status
+- **Manual Control**: Process pending SMS manually when needed
+
+### How It Works
+
+1. **SMS Reception**: When an SMS is received, it's immediately queued for processing
+2. **Dual Processing**:
+   - Immediate processing when app is active (for speed)
+   - Background processing when app is inactive (for reliability)
+3. **Queue Management**: Up to 100 SMS are kept in the queue to prevent storage issues
+4. **Automatic Retry**: Failed sends are retried with exponential backoff
+5. **Status Tracking**: All processing events are logged and can be monitored
+
+### Background Service Management
+
+Access the Background Service screen from the drawer menu to:
+
+- **Monitor Service Status**: Check if background processing is active
+- **View Queue Status**: See pending, processed, and failed SMS counts
+- **Manual Processing**: Trigger immediate processing of queued SMS
+- **Service Control**: Reinitialize or stop background services
+- **Troubleshooting**: Get guidance on optimizing background performance
+
+### Battery Optimization Setup
+
+For reliable background processing, disable battery optimization:
+
+1. Go to **Settings** → **Battery** → **Battery Optimization**
+2. Find your SMS to API app
+3. Select **"Don't optimize"** or **"Not optimized"**
+4. Some devices may require additional steps in manufacturer-specific battery settings
+
+### Permissions Required
+
+The background service requires these Android permissions:
+
+- `RECEIVE_SMS` - Listen for incoming SMS
+- `WAKE_LOCK` - Keep device awake for processing  
+- `RECEIVE_BOOT_COMPLETED` - Start service after device restart
+- `FOREGROUND_SERVICE` - Run background processing
+- `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` - Request battery optimization exemption
+
+### Troubleshooting Background Issues
+
+If SMS aren't being processed in the background:
+
+1. **Check Battery Optimization**: Ensure the app is exempt from battery optimization
+2. **Verify Permissions**: All required permissions must be granted
+3. **Check Service Status**: Use the Background Service screen to monitor status
+4. **Review Logs**: Check Application Logs for error messages
+5. **Restart Service**: Use "Reinitialize Service" button
+6. **Device Restart**: Some changes require a device restart to take effect
+
+## 📊 Application Logs
+
+The app includes a comprehensive logging system that records all activities for debugging and monitoring purposes.
+
+### Logging Features
+
+- **Categorized Logging**: Logs are organized by categories (SMS, API, Permissions, Storage, Filters, System, User)
+- **Multiple Log Levels**: DEBUG, INFO, WARN, ERROR, SUCCESS
+- **Persistent Storage**: Logs are stored locally using AsyncStorage
+- **Search & Filter**: Find specific logs by text, level, or category
+- **Export Capability**: Share logs for debugging or support
+- **Real-time Updates**: Logs update automatically as you use the app
 
 ## 📱 Screens
 
@@ -89,7 +158,7 @@ When an SMS is received, the app will send a POST request to your configured end
     "messageId": "sms_1625998200000_abc123def",
     "deviceInfo": {
       "platform": "android",
-      "appVersion": "1.0.1"
+      "appVersion": "1.1.0"
     }
   },
   "direction": "incoming"
@@ -100,7 +169,7 @@ When an SMS is received, the app will send a POST request to your configured end
 
 - `Content-Type: application/json`
 - `Authorization: Bearer YOUR_API_KEY`
-- `User-Agent: SMS-to-API-App/1.0.1`
+- `User-Agent: SMS-to-API-App/1.1.0`
 
 ## 🛠 Technical Implementation
 

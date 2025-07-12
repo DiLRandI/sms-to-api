@@ -2,7 +2,7 @@
   "expo": {
     "name": "sms-to-api",
     "slug": "sms-to-api",
-    "version": "1.0.1",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -23,7 +23,12 @@
       "edgeToEdgeEnabled": true,
       "permissions": [
         "RECEIVE_SMS",
-        "READ_SMS"
+        "READ_SMS",
+        "WAKE_LOCK",
+        "RECEIVE_BOOT_COMPLETED",
+        "FOREGROUND_SERVICE",
+        "SYSTEM_ALERT_WINDOW",
+        "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
       ],
       "package": "com.github.com.dilrandi.smstoapi"
     },
