@@ -320,7 +320,7 @@ export class SmsService {
     try {
       await LoggingService.info(LOG_CATEGORIES.SMS, 'Starting enhanced SMS background service');
 
-      // Check permissions first
+      // Check SMS permissions first
       const hasPermission = await this.checkSmsPermissions();
       if (!hasPermission) {
         const granted = await this.requestSmsPermissions();
@@ -335,16 +335,62 @@ export class SmsService {
         throw new Error('API configuration required for enhanced service');
       }
 
+      // Check all enhanced service permissions
+      const permissionStatus = await ExpoEnhancedSmsService.checkAllPermissions();
+      if (!permissionStatus.allGranted) {
+        await LoggingService.warn(LOG_CATEGORIES.PERMISSIONS, 'Enhanced service permissions incomplete', permissionStatus.details);
+        
+        let warningMessage = 'Enhanced service permissions status:\n\n';
+        warningMessage += `📱 SMS Permissions: ${hasPermission ? '✅ Granted' : '❌ Missing'}\n`;
+        warningMessage += `🔔 Notifications: ${permissionStatus.details.notifications ? '✅ Granted' : '⚠️ Limited'}\n`;
+        warningMessage += `🔄 Background Tasks: ${permissionStatus.details.backgroundFetch ? '✅ Available' : '⚠️ Limited'}\n\n`;
+        
+        if (!permissionStatus.details.notifications) {
+          warningMessage += 'Note: Without notification permissions, you won\'t see status updates from the enhanced service.\n\n';
+        }
+        
+        if (!permissionStatus.details.backgroundFetch) {
+          warningMessage += 'Note: Background processing may be limited. Enable background app refresh in device settings for better performance.\n\n';
+        }
+        
+        warningMessage += 'The service will still work but with reduced functionality. Continue?';
+        
+        return new Promise((resolve) => {
+          Alert.alert(
+            'Enhanced Service Permissions',
+            warningMessage,
+            [
+              { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'Continue Anyway', style: 'default', onPress: () => this.proceedWithEnhancedService(resolve) }
+            ],
+            { cancelable: true }
+          );
+        });
+      }
+
+      return await this.proceedWithEnhancedService();
+    } catch (error) {
+      await LoggingService.error(LOG_CATEGORIES.SMS, 'Failed to start enhanced SMS service', { error: error.message });
+      
+      Alert.alert(
+        'Enhanced Service Error',
+        `Failed to start enhanced background service:\n\n${error.message}\n\nYou can still use the regular SMS listener, but enhanced background processing won't be available.`,
+        [{ text: 'OK', style: 'default' }]
+      );
+      
+      return false;
+    }
+  }
+
+  /**
+   * Proceed with starting enhanced service after permission checks
+   * @param {Function} resolve - Promise resolve function (optional)
+   * @returns {Promise<boolean>} Success status
+   */
+  static async proceedWithEnhancedService(resolve = null) {
+    try {
       // Check if background fetch is available
       const backgroundAvailable = await ExpoEnhancedSmsService.isBackgroundAvailable();
-      if (!backgroundAvailable) {
-        Alert.alert(
-          'Background Processing Limited',
-          'Background app refresh is not available on this device. The enhanced service will work when the app is open or minimized, but may not work when completely closed.\n\nYou can enable background app refresh in your device settings.',
-          [{ text: 'Continue Anyway', style: 'default' }, { text: 'Cancel', style: 'cancel' }],
-          { cancelable: true }
-        );
-      }
 
       // Initialize and start enhanced service
       await ExpoEnhancedSmsService.initialize();
@@ -364,19 +410,15 @@ export class SmsService {
           [{ text: 'Great!', style: 'default' }]
         );
         
+        if (resolve) resolve(true);
         return true;
       }
       
+      if (resolve) resolve(false);
       return false;
     } catch (error) {
-      await LoggingService.error(LOG_CATEGORIES.SMS, 'Failed to start enhanced SMS service', { error: error.message });
-      
-      Alert.alert(
-        'Enhanced Service Error',
-        `Failed to start enhanced background service:\n\n${error.message}\n\nYou can still use the regular SMS listener, but enhanced background processing won't be available.`,
-        [{ text: 'OK', style: 'default' }]
-      );
-      
+      await LoggingService.error(LOG_CATEGORIES.SMS, 'Failed to proceed with enhanced service', { error: error.message });
+      if (resolve) resolve(false);
       return false;
     }
   }
@@ -645,6 +687,62 @@ export class SmsService {
       console.error('Error testing SMS setup:', error);
       
       return errorResult;
+    }
+  }
+
+  /**
+   * Test all permissions required for SMS services (regular + enhanced)
+   * @returns {Promise<Object>} Comprehensive permission status
+   */
+  static async testAllPermissions() {
+    try {
+      await LoggingService.info(LOG_CATEGORIES.SYSTEM, 'Testing all SMS service permissions');
+      
+      // Basic permissions
+      const hasSmsPermission = await this.checkSmsPermissions();
+      const apiSettings = await StorageService.getApiSettings();
+      const hasApiConfig = !!(apiSettings.endpoint && apiSettings.apiKey);
+
+      // Enhanced service permissions
+      const enhancedPermissions = await ExpoEnhancedSmsService.checkAllPermissions();
+
+      const permissionReport = {
+        basic: {
+          sms: hasSmsPermission,
+          apiConfig: hasApiConfig,
+          ready: hasSmsPermission && hasApiConfig,
+        },
+        enhanced: {
+          notifications: enhancedPermissions.details.notifications,
+          backgroundFetch: enhancedPermissions.details.backgroundFetch,
+          ready: enhancedPermissions.allGranted,
+        },
+        overall: {
+          regularServiceReady: hasSmsPermission && hasApiConfig,
+          enhancedServiceReady: hasSmsPermission && hasApiConfig && enhancedPermissions.allGranted,
+          anyServiceReady: hasSmsPermission && hasApiConfig,
+        },
+        platform: Platform.OS,
+        isListening: this.isListening,
+      };
+
+      await LoggingService.debug(LOG_CATEGORIES.SYSTEM, 'All permissions test completed', permissionReport);
+
+      return permissionReport;
+    } catch (error) {
+      const errorReport = {
+        basic: { sms: false, apiConfig: false, ready: false },
+        enhanced: { notifications: false, backgroundFetch: false, ready: false },
+        overall: { regularServiceReady: false, enhancedServiceReady: false, anyServiceReady: false },
+        platform: Platform.OS,
+        isListening: false,
+        error: error.message,
+      };
+      
+      await LoggingService.error(LOG_CATEGORIES.SYSTEM, 'All permissions test failed', errorReport);
+      console.error('Error testing all permissions:', error);
+      
+      return errorReport;
     }
   }
 }

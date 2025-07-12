@@ -29,6 +29,16 @@ export class ExpoEnhancedSmsService {
     try {
       await LoggingService.info(LOG_CATEGORIES.SMS, 'Initializing Enhanced SMS Service');
       
+      // Check and request notification permissions
+      const hasNotificationPermissions = await this.checkNotificationPermissions();
+      if (!hasNotificationPermissions) {
+        await LoggingService.warn(LOG_CATEGORIES.PERMISSIONS, 'Notification permissions not granted, requesting...');
+        const granted = await this.requestNotificationPermissions();
+        if (!granted) {
+          await LoggingService.warn(LOG_CATEGORIES.PERMISSIONS, 'Enhanced service will work with limited notifications');
+        }
+      }
+      
       // Setup notifications
       await this.setupNotifications();
       
@@ -47,6 +57,53 @@ export class ExpoEnhancedSmsService {
       return true;
     } catch (error) {
       await LoggingService.error(LOG_CATEGORIES.SMS, 'Failed to initialize Enhanced SMS Service', { error: error.message });
+      return false;
+    }
+  }
+
+  /**
+   * Check if notification permissions are granted
+   */
+  static async checkNotificationPermissions() {
+    try {
+      const { status } = await Notifications.getPermissionsAsync();
+      await LoggingService.debug(LOG_CATEGORIES.PERMISSIONS, 'Notification permission check', { status });
+      return status === 'granted';
+    } catch (error) {
+      await LoggingService.error(LOG_CATEGORIES.PERMISSIONS, 'Error checking notification permissions', { error: error.message });
+      return false;
+    }
+  }
+
+  /**
+   * Request notification permissions from user
+   */
+  static async requestNotificationPermissions() {
+    try {
+      await LoggingService.info(LOG_CATEGORIES.PERMISSIONS, 'Requesting notification permissions');
+      
+      const { status } = await Notifications.requestPermissionsAsync({
+        ios: {
+          allowAlert: true,
+          allowBadge: true,
+          allowSound: false,
+        },
+        android: {
+          allowAlert: true,
+          allowBadge: true,
+          allowSound: false,
+        },
+      });
+
+      if (status === 'granted') {
+        await LoggingService.success(LOG_CATEGORIES.PERMISSIONS, 'Notification permissions granted');
+        return true;
+      } else {
+        await LoggingService.warn(LOG_CATEGORIES.PERMISSIONS, 'Notification permissions denied', { status });
+        return false;
+      }
+    } catch (error) {
+      await LoggingService.error(LOG_CATEGORIES.PERMISSIONS, 'Error requesting notification permissions', { error: error.message });
       return false;
     }
   }
@@ -461,6 +518,32 @@ export class ExpoEnhancedSmsService {
       return status === BackgroundFetch.BackgroundFetchStatus.Available;
     } catch (error) {
       return false;
+    }
+  }
+
+  /**
+   * Check all required permissions for enhanced service
+   */
+  static async checkAllPermissions() {
+    try {
+      const permissions = {
+        notifications: await this.checkNotificationPermissions(),
+        backgroundFetch: await this.isBackgroundAvailable(),
+      };
+
+      await LoggingService.debug(LOG_CATEGORIES.PERMISSIONS, 'All permissions check completed', permissions);
+      
+      return {
+        allGranted: permissions.notifications && permissions.backgroundFetch,
+        details: permissions,
+      };
+    } catch (error) {
+      await LoggingService.error(LOG_CATEGORIES.PERMISSIONS, 'Error checking all permissions', { error: error.message });
+      return {
+        allGranted: false,
+        details: { notifications: false, backgroundFetch: false },
+        error: error.message,
+      };
     }
   }
 }
