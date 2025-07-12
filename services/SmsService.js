@@ -5,12 +5,12 @@ import ApiService from './ApiService';
 import StorageService from './StorageService';
 import ContactFilterService from './ContactFilterService';
 import LoggingService, { LOG_LEVELS, LOG_CATEGORIES } from './LoggingService';
-import PersistentSmsService from './PersistentSmsService';
+import ExpoEnhancedSmsService from './ExpoEnhancedSmsService';
 
 /**
  * SMS Service for handling incoming SMS messages on Android
  * Professional implementation with proper permissions and error handling
- * Uses PersistentSmsService for enhanced background operation
+ * Uses ExpoEnhancedSmsService for improved background operation
  */
 export class SmsService {
   static subscription = null;
@@ -312,44 +312,55 @@ export class SmsService {
   }
 
   /**
-   * Start persistent background service for SMS listening
-   * This service will continue running even when the app is completely closed
+   * Start enhanced background service for SMS listening
+   * This service provides improved reliability with Expo background tasks
    * @returns {Promise<boolean>} Success status
    */
-  static async startPersistentService() {
+  static async startEnhancedService() {
     try {
-      await LoggingService.info(LOG_CATEGORIES.SMS, 'Starting persistent SMS background service');
+      await LoggingService.info(LOG_CATEGORIES.SMS, 'Starting enhanced SMS background service');
 
       // Check permissions first
       const hasPermission = await this.checkSmsPermissions();
       if (!hasPermission) {
         const granted = await this.requestSmsPermissions();
         if (!granted) {
-          throw new Error('SMS permissions required for persistent service');
+          throw new Error('SMS permissions required for enhanced service');
         }
       }
 
       // Check API configuration
       const apiSettings = await StorageService.getApiSettings();
       if (!apiSettings.endpoint || !apiSettings.apiKey) {
-        throw new Error('API configuration required for persistent service');
+        throw new Error('API configuration required for enhanced service');
       }
 
-      // Initialize and start persistent service
-      await PersistentSmsService.initialize();
-      const started = await PersistentSmsService.startPersistentService();
+      // Check if background fetch is available
+      const backgroundAvailable = await ExpoEnhancedSmsService.isBackgroundAvailable();
+      if (!backgroundAvailable) {
+        Alert.alert(
+          'Background Processing Limited',
+          'Background app refresh is not available on this device. The enhanced service will work when the app is open or minimized, but may not work when completely closed.\n\nYou can enable background app refresh in your device settings.',
+          [{ text: 'Continue Anyway', style: 'default' }, { text: 'Cancel', style: 'cancel' }],
+          { cancelable: true }
+        );
+      }
+
+      // Initialize and start enhanced service
+      await ExpoEnhancedSmsService.initialize();
+      const started = await ExpoEnhancedSmsService.startEnhancedService();
 
       if (started) {
-        await LoggingService.success(LOG_CATEGORIES.SMS, 'Persistent SMS service started successfully');
+        await LoggingService.success(LOG_CATEGORIES.SMS, 'Enhanced SMS service started successfully');
         
         Alert.alert(
-          'Persistent SMS Service Started',
-          '🚀 Enhanced Background Service Active!\n\n' +
-          '✅ SMS listening will continue even when app is completely closed\n' +
-          '✅ Persistent foreground service with notification\n' +
+          'Enhanced SMS Service Started',
+          '🚀 Improved Background Service Active!\n\n' +
+          '✅ Enhanced SMS listening with background processing\n' +
           '✅ Automatic message queuing and retry\n' +
-          '✅ Real-time API forwarding\n\n' +
-          'You can now close the app completely and SMS forwarding will continue to work.',
+          '✅ Improved reliability for background operation\n' +
+          `${backgroundAvailable ? '✅ Background processing available' : '⚠️ Background processing limited - check device settings'}\n\n` +
+          'The service will work better when background app refresh is enabled in device settings.',
           [{ text: 'Great!', style: 'default' }]
         );
         
@@ -358,11 +369,11 @@ export class SmsService {
       
       return false;
     } catch (error) {
-      await LoggingService.error(LOG_CATEGORIES.SMS, 'Failed to start persistent SMS service', { error: error.message });
+      await LoggingService.error(LOG_CATEGORIES.SMS, 'Failed to start enhanced SMS service', { error: error.message });
       
       Alert.alert(
-        'Persistent Service Error',
-        `Failed to start persistent background service:\n\n${error.message}\n\nYou can still use the regular SMS listener, but it may not work when the app is completely closed.`,
+        'Enhanced Service Error',
+        `Failed to start enhanced background service:\n\n${error.message}\n\nYou can still use the regular SMS listener, but enhanced background processing won't be available.`,
         [{ text: 'OK', style: 'default' }]
       );
       
@@ -371,21 +382,21 @@ export class SmsService {
   }
 
   /**
-   * Stop persistent background service
+   * Stop enhanced background service
    * @returns {Promise<boolean>} Success status
    */
-  static async stopPersistentService() {
+  static async stopEnhancedService() {
     try {
-      await LoggingService.info(LOG_CATEGORIES.SMS, 'Stopping persistent SMS background service');
+      await LoggingService.info(LOG_CATEGORIES.SMS, 'Stopping enhanced SMS background service');
       
-      const stopped = await PersistentSmsService.stopPersistentService();
+      const stopped = await ExpoEnhancedSmsService.stopEnhancedService();
       
       if (stopped) {
-        await LoggingService.success(LOG_CATEGORIES.SMS, 'Persistent SMS service stopped successfully');
+        await LoggingService.success(LOG_CATEGORIES.SMS, 'Enhanced SMS service stopped successfully');
         
         Alert.alert(
-          'Persistent Service Stopped',
-          'The persistent background SMS service has been stopped.\n\nSMS forwarding will no longer work when the app is closed.',
+          'Enhanced Service Stopped',
+          'The enhanced background SMS service has been stopped.\n\nSMS forwarding reliability may be reduced when the app is in the background.',
           [{ text: 'OK', style: 'default' }]
         );
         
@@ -394,11 +405,11 @@ export class SmsService {
       
       return false;
     } catch (error) {
-      await LoggingService.error(LOG_CATEGORIES.SMS, 'Failed to stop persistent SMS service', { error: error.message });
+      await LoggingService.error(LOG_CATEGORIES.SMS, 'Failed to stop enhanced SMS service', { error: error.message });
       
       Alert.alert(
         'Error',
-        `Failed to stop persistent service: ${error.message}`,
+        `Failed to stop enhanced service: ${error.message}`,
         [{ text: 'OK', style: 'default' }]
       );
       
@@ -407,7 +418,7 @@ export class SmsService {
   }
 
   /**
-   * Get status of both regular and persistent SMS services
+   * Get status of both regular and enhanced SMS services
    * @returns {Promise<Object>} Service status information
    */
   static async getServiceStatus() {
@@ -418,17 +429,20 @@ export class SmsService {
         currentAppState: this.currentAppState,
       };
 
-      const persistentStatus = await PersistentSmsService.getServiceStatus();
+      const enhancedStatus = await ExpoEnhancedSmsService.getServiceStatus();
       
       return {
         regular: regularStatus,
-        persistent: persistentStatus,
-        isAnyActive: this.isListening || persistentStatus.isRunning,
+        enhanced: enhancedStatus,
+        // For compatibility with existing UI
+        persistent: enhancedStatus,
+        isAnyActive: this.isListening || enhancedStatus.isRunning,
       };
     } catch (error) {
       await LoggingService.error(LOG_CATEGORIES.SMS, 'Failed to get service status', { error: error.message });
       return {
         regular: { isListening: false, error: error.message },
+        enhanced: { isRunning: false, error: error.message },
         persistent: { isRunning: false, error: error.message },
         isAnyActive: false,
       };

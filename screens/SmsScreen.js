@@ -262,12 +262,12 @@ const PersistentServiceCard = ({ isConfigured, hasPermission }) => {
   const handleStartPersistent = async () => {
     setIsLoading(true);
     try {
-      const success = await SmsService.startPersistentService();
+      const success = await SmsService.startEnhancedService();
       if (success) {
         await checkPersistentStatus();
       }
     } catch (error) {
-      console.error('Error starting persistent service:', error);
+      console.error('Error starting enhanced service:', error);
     } finally {
       setIsLoading(false);
     }
@@ -276,12 +276,12 @@ const PersistentServiceCard = ({ isConfigured, hasPermission }) => {
   const handleStopPersistent = async () => {
     setIsLoading(true);
     try {
-      const success = await SmsService.stopPersistentService();
+      const success = await SmsService.stopEnhancedService();
       if (success) {
         await checkPersistentStatus();
       }
     } catch (error) {
-      console.error('Error stopping persistent service:', error);
+      console.error('Error stopping enhanced service:', error);
     } finally {
       setIsLoading(false);
     }
@@ -302,7 +302,7 @@ const PersistentServiceCard = ({ isConfigured, hasPermission }) => {
         </View>
         <View style={styles.persistentInfo}>
           <Text style={styles.persistentTitle}>
-            Persistent Service {isRunning ? "ACTIVE" : "INACTIVE"}
+            Enhanced Service {isRunning ? "ACTIVE" : "INACTIVE"}
           </Text>
           <Text style={styles.persistentDesc}>
             {isRunning 
@@ -338,7 +338,7 @@ const PersistentServiceCard = ({ isConfigured, hasPermission }) => {
             ) : (
               <>
                 <Ionicons name="play" size={16} color="#fff" />
-                <Text style={styles.persistentButtonText}>Start Persistent Service</Text>
+                <Text style={styles.persistentButtonText}>Start Enhanced Service</Text>
               </>
             )}
           </TouchableOpacity>
@@ -353,7 +353,7 @@ const PersistentServiceCard = ({ isConfigured, hasPermission }) => {
             ) : (
               <>
                 <Ionicons name="stop" size={16} color="#fff" />
-                <Text style={styles.persistentButtonText}>Stop Persistent Service</Text>
+                <Text style={styles.persistentButtonText}>Stop Enhanced Service</Text>
               </>
             )}
           </TouchableOpacity>
@@ -381,11 +381,11 @@ const PersistentServiceCard = ({ isConfigured, hasPermission }) => {
       )}
 
       <View style={styles.persistentFeatures}>
-        <Text style={styles.featuresTitle}>✨ Persistent Service Features:</Text>
-        <Text style={styles.featureItem}>• Works when app is completely closed</Text>
+        <Text style={styles.featuresTitle}>✨ Enhanced Service Features:</Text>
+        <Text style={styles.featureItem}>• Works with Expo managed workflow</Text>
+        <Text style={styles.featureItem}>• Background task management with TaskManager</Text>
         <Text style={styles.featureItem}>• Automatic message queuing and retry</Text>
-        <Text style={styles.featureItem}>• Real-time status notifications</Text>
-        <Text style={styles.featureItem}>• Enhanced reliability for 24/7 monitoring</Text>
+        <Text style={styles.featureItem}>• Enhanced reliability for monitoring</Text>
       </View>
     </View>
   );
