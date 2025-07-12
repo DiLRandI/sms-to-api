@@ -58,8 +58,25 @@ class ContactFilterService {
     // Check if sender matches any filtered contact
     bool isInFilterList = filteredContacts.any((contact) {
       final normalizedContact = _normalizeContact(contact);
-      return normalizedSender.contains(normalizedContact) ||
-          normalizedContact.contains(normalizedSender);
+
+      // For phone numbers, also check without the + prefix to handle international numbers
+      final senderWithoutPlus = normalizedSender.startsWith('+')
+          ? normalizedSender.substring(1)
+          : normalizedSender;
+      final contactWithoutPlus = normalizedContact.startsWith('+')
+          ? normalizedContact.substring(1)
+          : normalizedContact;
+
+      // Check multiple matching conditions:
+      // 1. Exact match
+      // 2. One contains the other (for partial matches)
+      // 3. Match without + prefix (for international numbers)
+      return normalizedSender == normalizedContact ||
+          normalizedSender.contains(normalizedContact) ||
+          normalizedContact.contains(normalizedSender) ||
+          senderWithoutPlus == contactWithoutPlus ||
+          senderWithoutPlus.contains(contactWithoutPlus) ||
+          contactWithoutPlus.contains(senderWithoutPlus);
     });
 
     if (filterMode == 'whitelist') {
@@ -71,9 +88,9 @@ class ContactFilterService {
     }
   }
 
-  // Normalize contact for comparison (remove spaces, dashes, etc.)
+  // Normalize contact for comparison (remove spaces, dashes, parentheses but keep + for international numbers)
   static String _normalizeContact(String contact) {
-    return contact.replaceAll(RegExp(r'[\s\-\(\)\+]'), '').toLowerCase();
+    return contact.replaceAll(RegExp(r'[\s\-\(\)]'), '').toLowerCase();
   }
 
   // Get unique senders from SMS history for suggestion
@@ -126,9 +143,15 @@ class ContactFilterService {
   static Future<void> addWhitelistContact(String contact) async {
     final prefs = await SharedPreferences.getInstance();
     final contacts = prefs.getStringList('filter_whitelist') ?? [];
-    final normalizedContact = _normalizeContact(contact);
-    if (!contacts.contains(normalizedContact)) {
-      contacts.add(normalizedContact);
+
+    // Check if contact already exists (normalized comparison but store original)
+    final normalizedNewContact = _normalizeContact(contact);
+    final alreadyExists = contacts.any((existingContact) {
+      return _normalizeContact(existingContact) == normalizedNewContact;
+    });
+
+    if (!alreadyExists) {
+      contacts.add(contact); // Store the original contact with + if present
       await prefs.setStringList('filter_whitelist', contacts);
     }
   }
@@ -136,8 +159,9 @@ class ContactFilterService {
   static Future<void> removeWhitelistContact(String contact) async {
     final prefs = await SharedPreferences.getInstance();
     final contacts = prefs.getStringList('filter_whitelist') ?? [];
-    final normalizedContact = _normalizeContact(contact);
-    contacts.remove(normalizedContact);
+
+    // Remove by exact match (to maintain the original format)
+    contacts.remove(contact);
     await prefs.setStringList('filter_whitelist', contacts);
   }
 
@@ -150,9 +174,15 @@ class ContactFilterService {
   static Future<void> addBlacklistContact(String contact) async {
     final prefs = await SharedPreferences.getInstance();
     final contacts = prefs.getStringList('filter_blacklist') ?? [];
-    final normalizedContact = _normalizeContact(contact);
-    if (!contacts.contains(normalizedContact)) {
-      contacts.add(normalizedContact);
+
+    // Check if contact already exists (normalized comparison but store original)
+    final normalizedNewContact = _normalizeContact(contact);
+    final alreadyExists = contacts.any((existingContact) {
+      return _normalizeContact(existingContact) == normalizedNewContact;
+    });
+
+    if (!alreadyExists) {
+      contacts.add(contact); // Store the original contact with + if present
       await prefs.setStringList('filter_blacklist', contacts);
     }
   }
@@ -160,8 +190,9 @@ class ContactFilterService {
   static Future<void> removeBlacklistContact(String contact) async {
     final prefs = await SharedPreferences.getInstance();
     final contacts = prefs.getStringList('filter_blacklist') ?? [];
-    final normalizedContact = _normalizeContact(contact);
-    contacts.remove(normalizedContact);
+
+    // Remove by exact match (to maintain the original format)
+    contacts.remove(contact);
     await prefs.setStringList('filter_blacklist', contacts);
   }
 }
