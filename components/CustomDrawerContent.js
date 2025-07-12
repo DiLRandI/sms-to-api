@@ -21,6 +21,11 @@ const CustomDrawerContent = ({ navigation, state }) => {
       icon: 'filter-outline',
     },
     {
+      name: 'Application Logs',
+      routeName: 'Logs',
+      icon: 'document-text-outline',
+    },
+    {
       name: 'Settings',
       routeName: 'Settings',
       icon: 'settings-outline',
@@ -31,7 +36,7 @@ const CustomDrawerContent = ({ navigation, state }) => {
     <DrawerContentScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.appName}>SMS to API</Text>
-        <Text style={styles.appVersion}>v1.0.0</Text>
+        <Text style={styles.appVersion}>v1.0.1</Text>
       </View>
       
       <View style={styles.menuItems}>

@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import LoggingService, { LOG_LEVELS, LOG_CATEGORIES } from './LoggingService';
 
 // Storage keys
 const STORAGE_KEYS = {
@@ -17,8 +18,10 @@ export class StorageService {
   static async saveApiEndpoint(endpoint) {
     try {
       await AsyncStorage.setItem(STORAGE_KEYS.API_ENDPOINT, endpoint);
+      await LoggingService.info(LOG_CATEGORIES.STORAGE, 'API endpoint saved successfully', { endpoint });
       return true;
     } catch (error) {
+      await LoggingService.error(LOG_CATEGORIES.STORAGE, 'Failed to save API endpoint', { error: error.message });
       console.error('Error saving API endpoint:', error);
       return false;
     }
@@ -31,8 +34,10 @@ export class StorageService {
   static async saveApiKey(apiKey) {
     try {
       await AsyncStorage.setItem(STORAGE_KEYS.API_KEY, apiKey);
+      await LoggingService.info(LOG_CATEGORIES.STORAGE, 'API key saved successfully');
       return true;
     } catch (error) {
+      await LoggingService.error(LOG_CATEGORIES.STORAGE, 'Failed to save API key', { error: error.message });
       console.error('Error saving API key:', error);
       return false;
     }

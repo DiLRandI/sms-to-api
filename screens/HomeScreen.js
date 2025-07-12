@@ -5,6 +5,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import useApiSettings from '../hooks/useApiSettings';
 import SmsService from '../services/SmsService';
 import ContactFilterService from '../services/ContactFilterService';
+import LoggingService, { LOG_LEVELS, LOG_CATEGORIES } from '../services/LoggingService';
 
 const HomeScreen = () => {
   const navigation = useNavigation();
@@ -30,6 +31,8 @@ const HomeScreen = () => {
 
   const checkSmsStatus = async () => {
     try {
+      await LoggingService.debug(LOG_CATEGORIES.SYSTEM, 'Checking SMS and filter status from Home screen');
+      
       const [smsStatusResult, filterSummary] = await Promise.all([
         SmsService.testSmsSetup(),
         ContactFilterService.getFilterSummary(),
@@ -37,7 +40,14 @@ const HomeScreen = () => {
       
       setSmsStatus(smsStatusResult);
       setFilterStatus(filterSummary);
+
+      await LoggingService.debug(LOG_CATEGORIES.SYSTEM, 'SMS and filter status updated', {
+        smsReady: smsStatusResult.ready,
+        isListening: smsStatusResult.isListening,
+        filterMode: filterSummary.filterMode
+      });
     } catch (error) {
+      await LoggingService.error(LOG_CATEGORIES.SYSTEM, 'Error checking SMS status', { error: error.message });
       console.error('Error checking SMS status:', error);
     }
   };

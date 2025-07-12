@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createDrawerNavigator } from '@react-navigation/drawer';
@@ -9,13 +9,31 @@ import HomeScreen from './screens/HomeScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import SmsScreen from './screens/SmsScreen';
 import ContactFilterScreen from './screens/ContactFilterScreen';
+import LogsScreen from './screens/LogsScreen';
 
 // Import custom drawer content
 import CustomDrawerContent from './components/CustomDrawerContent';
 
+// Import logging service
+import LoggingService, { LOG_LEVELS, LOG_CATEGORIES } from './services/LoggingService';
+
 const Drawer = createDrawerNavigator();
 
 export default function App() {
+  // Initialize logging service when app starts
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        await LoggingService.initialize();
+        await LoggingService.info(LOG_CATEGORIES.SYSTEM, 'SMS to API application started');
+      } catch (error) {
+        console.error('Failed to initialize logging service:', error);
+      }
+    };
+
+    initializeApp();
+  }, []);
+
   return (
     <NavigationContainer>
       <StatusBar style="auto" />
@@ -65,6 +83,13 @@ export default function App() {
           component={ContactFilterScreen}
           options={{
             headerTitle: 'Contact Filters',
+          }}
+        />
+        <Drawer.Screen 
+          name="Logs" 
+          component={LogsScreen}
+          options={{
+            headerTitle: 'Application Logs',
           }}
         />
         <Drawer.Screen 

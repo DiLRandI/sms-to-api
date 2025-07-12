@@ -3,6 +3,7 @@ import SmsListener from 'react-native-android-sms-listener';
 import ApiService from './ApiService';
 import StorageService from './StorageService';
 import ContactFilterService from './ContactFilterService';
+import LoggingService, { LOG_LEVELS, LOG_CATEGORIES } from './LoggingService';
 
 /**
  * SMS Service for handling incoming SMS messages on Android
@@ -18,11 +19,15 @@ export class SmsService {
    */
   static async requestSmsPermissions() {
     if (Platform.OS !== 'android') {
-      Alert.alert('Platform Error', 'SMS listening is only available on Android devices');
+      const errorMsg = 'SMS listening is only available on Android devices';
+      await LoggingService.error(LOG_CATEGORIES.PERMISSIONS, errorMsg);
+      Alert.alert('Platform Error', errorMsg);
       return false;
     }
 
     try {
+      await LoggingService.info(LOG_CATEGORIES.PERMISSIONS, 'Requesting SMS permissions from user');
+      
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.RECEIVE_SMS,
         {
@@ -35,9 +40,11 @@ export class SmsService {
       );
 
       if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+        await LoggingService.success(LOG_CATEGORIES.PERMISSIONS, 'SMS permission granted by user');
         console.log('SMS permission granted');
         return true;
       } else {
+        await LoggingService.warn(LOG_CATEGORIES.PERMISSIONS, 'SMS permission denied by user', { granted });
         console.log('SMS permission denied');
         Alert.alert(
           'Permission Required',
@@ -46,6 +53,7 @@ export class SmsService {
         return false;
       }
     } catch (error) {
+      await LoggingService.error(LOG_CATEGORIES.PERMISSIONS, 'Failed to request SMS permission', { error: error.message });
       console.error('Error requesting SMS permission:', error);
       Alert.alert('Error', 'Failed to request SMS permission');
       return false;
@@ -58,13 +66,16 @@ export class SmsService {
    */
   static async checkSmsPermissions() {
     if (Platform.OS !== 'android') {
+      await LoggingService.warn(LOG_CATEGORIES.PERMISSIONS, 'SMS permissions check failed: Not Android platform');
       return false;
     }
 
     try {
       const granted = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.RECEIVE_SMS);
+      await LoggingService.debug(LOG_CATEGORIES.PERMISSIONS, 'SMS permission check completed', { granted });
       return granted;
     } catch (error) {
+      await LoggingService.error(LOG_CATEGORIES.PERMISSIONS, 'Error checking SMS permission', { error: error.message });
       console.error('Error checking SMS permission:', error);
       return false;
     }
@@ -76,14 +87,19 @@ export class SmsService {
    */
   static async startListening() {
     try {
+      await LoggingService.info(LOG_CATEGORIES.SMS, 'Attempting to start SMS listener');
+
       // Check platform
       if (Platform.OS !== 'android') {
-        Alert.alert('Platform Error', 'SMS listening is only available on Android devices');
+        const errorMsg = 'SMS listening is only available on Android devices';
+        await LoggingService.error(LOG_CATEGORIES.SMS, errorMsg);
+        Alert.alert('Platform Error', errorMsg);
         return false;
       }
 
       // Check if already listening
       if (this.isListening) {
+        await LoggingService.warn(LOG_CATEGORIES.SMS, 'SMS listener start requested but already active');
         console.log('SMS listener is already active');
         return true;
       }
@@ -91,8 +107,10 @@ export class SmsService {
       // Check permissions
       const hasPermission = await this.checkSmsPermissions();
       if (!hasPermission) {
+        await LoggingService.warn(LOG_CATEGORIES.SMS, 'SMS permissions not granted, requesting permissions');
         const granted = await this.requestSmsPermissions();
         if (!granted) {
+          await LoggingService.error(LOG_CATEGORIES.SMS, 'SMS listener failed to start: permissions denied');
           return false;
         }
       }
@@ -100,6 +118,11 @@ export class SmsService {
       // Check API configuration
       const apiSettings = await StorageService.getApiSettings();
       if (!apiSettings.endpoint || !apiSettings.apiKey) {
+        const errorMsg = 'API configuration missing (endpoint or key)';
+        await LoggingService.error(LOG_CATEGORIES.SMS, errorMsg, { 
+          hasEndpoint: !!apiSettings.endpoint, 
+          hasApiKey: !!apiSettings.apiKey 
+        });
         Alert.alert(
           'Configuration Required',
           'Please configure your API endpoint and key in Settings before starting SMS listening.'
@@ -113,6 +136,7 @@ export class SmsService {
       });
 
       this.isListening = true;
+      await LoggingService.success(LOG_CATEGORIES.SMS, 'SMS listener started successfully');
       console.log('SMS listener started successfully');
       
       Alert.alert(
@@ -123,6 +147,7 @@ export class SmsService {
 
       return true;
     } catch (error) {
+      await LoggingService.error(LOG_CATEGORIES.SMS, 'Failed to start SMS listener', { error: error.message });
       console.error('Error starting SMS listener:', error);
       Alert.alert('Error', 'Failed to start SMS listener: ' + error.message);
       return false;
@@ -133,14 +158,17 @@ export class SmsService {
    * Stop listening for SMS messages
    * @returns {boolean} Success status
    */
-  static stopListening() {
+  static async stopListening() {
     try {
+      await LoggingService.info(LOG_CATEGORIES.SMS, 'Stopping SMS listener');
+
       if (this.subscription) {
         this.subscription.remove();
         this.subscription = null;
       }
       
       this.isListening = false;
+      await LoggingService.success(LOG_CATEGORIES.SMS, 'SMS listener stopped successfully');
       console.log('SMS listener stopped');
       
       Alert.alert(
@@ -151,6 +179,7 @@ export class SmsService {
 
       return true;
     } catch (error) {
+      await LoggingService.error(LOG_CATEGORIES.SMS, 'Failed to stop SMS listener', { error: error.message });
       console.error('Error stopping SMS listener:', error);
       Alert.alert('Error', 'Failed to stop SMS listener: ' + error.message);
       return false;
@@ -164,16 +193,23 @@ export class SmsService {
    */
   static async handleIncomingSms(message, apiSettings) {
     try {
-      console.log('Incoming SMS received:', {
+      const smsInfo = {
         originatingAddress: message.originatingAddress,
         body: message.body,
         timestamp: new Date().toISOString(),
-      });
+      };
+      
+      await LoggingService.info(LOG_CATEGORIES.SMS, 'Incoming SMS received', smsInfo);
+      console.log('Incoming SMS received:', smsInfo);
 
       // Check if this number should be forwarded based on user filters
       const shouldForward = await ContactFilterService.shouldForwardSms(message.originatingAddress);
       
       if (!shouldForward) {
+        await LoggingService.warn(LOG_CATEGORIES.FILTERS, 'SMS blocked by user filter', {
+          phoneNumber: message.originatingAddress,
+          messagePreview: message.body.substring(0, 50)
+        });
         console.log(`SMS from ${message.originatingAddress} blocked by user filter`);
         this.showFilteredNotification(message.originatingAddress);
         return;
@@ -187,9 +223,15 @@ export class SmsService {
         messageId: this.generateMessageId(),
         deviceInfo: {
           platform: Platform.OS,
-          appVersion: '1.0.0', // You could import this from package.json
+          appVersion: '1.0.1', // You could import this from package.json
         },
       };
+
+      await LoggingService.debug(LOG_CATEGORIES.API, 'Forwarding SMS to API', {
+        messageId: smsData.messageId,
+        from: smsData.from,
+        endpoint: apiSettings.endpoint
+      });
 
       // Send to API
       const result = await ApiService.sendSms({
@@ -204,14 +246,30 @@ export class SmsService {
       });
 
       if (result.success) {
+        await LoggingService.success(LOG_CATEGORIES.API, 'SMS forwarded to API successfully', {
+          messageId: smsData.messageId,
+          from: smsData.from,
+          responseData: result.data
+        });
         console.log('SMS forwarded to API successfully:', result);
         // Optionally show a subtle notification
         this.showSuccessNotification(smsData);
       } else {
+        await LoggingService.error(LOG_CATEGORIES.API, 'Failed to forward SMS to API', {
+          messageId: smsData.messageId,
+          from: smsData.from,
+          error: result.message,
+          statusCode: result.statusCode
+        });
         console.error('Failed to forward SMS to API:', result);
         this.showErrorNotification(result.message);
       }
     } catch (error) {
+      await LoggingService.error(LOG_CATEGORIES.SMS, 'Error handling incoming SMS', {
+        error: error.message,
+        phoneNumber: message?.originatingAddress,
+        messagePreview: message?.body?.substring(0, 50)
+      });
       console.error('Error handling incoming SMS:', error);
       this.showErrorNotification('Failed to process incoming SMS');
     }
@@ -231,6 +289,10 @@ export class SmsService {
    */
   static showSuccessNotification(smsData) {
     // For production, you might want to use a toast notification instead
+    LoggingService.debug(LOG_CATEGORIES.USER, 'Success notification shown', {
+      messageId: smsData.messageId,
+      from: smsData.from
+    });
     console.log(`✅ SMS from ${smsData.from} forwarded to API`);
   }
 
@@ -239,6 +301,7 @@ export class SmsService {
    * @param {string} phoneNumber - Phone number that was filtered
    */
   static showFilteredNotification(phoneNumber) {
+    LoggingService.debug(LOG_CATEGORIES.USER, 'Filtered notification shown', { phoneNumber });
     console.log(`🚫 SMS from ${phoneNumber} filtered (not forwarded)`);
   }
 
@@ -248,6 +311,7 @@ export class SmsService {
    */
   static showErrorNotification(message) {
     // For production, you might want to use a toast notification instead
+    LoggingService.warn(LOG_CATEGORIES.USER, 'Error notification shown', { message });
     console.error(`❌ SMS forwarding failed: ${message}`);
     
     // Only show alert for critical errors
@@ -274,20 +338,25 @@ export class SmsService {
    */
   static async testSmsSetup() {
     try {
+      await LoggingService.info(LOG_CATEGORIES.SYSTEM, 'Testing SMS setup configuration');
+      
       const hasPermission = await this.checkSmsPermissions();
       const apiSettings = await StorageService.getApiSettings();
       const hasApiConfig = !!(apiSettings.endpoint && apiSettings.apiKey);
 
-      return {
+      const testResult = {
         hasPermission,
         hasApiConfig,
         isListening: this.isListening,
         platform: Platform.OS,
         ready: hasPermission && hasApiConfig,
       };
+
+      await LoggingService.debug(LOG_CATEGORIES.SYSTEM, 'SMS setup test completed', testResult);
+
+      return testResult;
     } catch (error) {
-      console.error('Error testing SMS setup:', error);
-      return {
+      const errorResult = {
         hasPermission: false,
         hasApiConfig: false,
         isListening: false,
@@ -295,6 +364,11 @@ export class SmsService {
         ready: false,
         error: error.message,
       };
+      
+      await LoggingService.error(LOG_CATEGORIES.SYSTEM, 'SMS setup test failed', errorResult);
+      console.error('Error testing SMS setup:', error);
+      
+      return errorResult;
     }
   }
 }

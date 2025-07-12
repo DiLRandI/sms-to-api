@@ -89,7 +89,7 @@ When an SMS is received, the app will send a POST request to your configured end
     "messageId": "sms_1625998200000_abc123def",
     "deviceInfo": {
       "platform": "android",
-      "appVersion": "1.0.0"
+      "appVersion": "1.0.1"
     }
   },
   "direction": "incoming"
@@ -100,7 +100,7 @@ When an SMS is received, the app will send a POST request to your configured end
 
 - `Content-Type: application/json`
 - `Authorization: Bearer YOUR_API_KEY`
-- `User-Agent: SMS-to-API-App/1.0.0`
+- `User-Agent: SMS-to-API-App/1.0.1`
 
 ## 🛠 Technical Implementation
 
@@ -158,7 +158,7 @@ Use the "Test Configuration" button in the SMS Listener screen to verify:
 
 ### Project Structure
 
-```
+```text
 ├── components/
 │   └── CustomDrawerContent.js
 ├── hooks/
@@ -176,14 +176,65 @@ Use the "Test Configuration" button in the SMS Listener screen to verify:
 
 ### Building for Production
 
-1. Configure your app signing
-2. Build APK/AAB:
+#### APK Build (for direct installation/testing)
 
-   ```bash
-   expo build:android
-   ```
+```bash
+npx eas build --platform android --profile preview
+```
 
-## 📄 License
+#### AAB Build (for Google Play Store)
+
+```bash
+npx eas build --platform android --profile production
+```
+
+#### Development Build
+
+```bash
+npx eas build --platform android --profile development
+```
+
+**Build Types:**
+
+- **APK**: Direct installation on Android devices, side-loading, testing
+- **AAB**: Google Play Store uploads (required), smaller user downloads
+
+## � Application Logs
+
+The app includes a comprehensive logging system that records all activities for debugging and monitoring purposes.
+
+### Features
+
+- **Categorized Logging**: Logs are organized by categories (SMS, API, Permissions, Storage, Filters, System, User)
+- **Multiple Log Levels**: DEBUG, INFO, WARN, ERROR, SUCCESS
+- **Persistent Storage**: Logs are stored locally using AsyncStorage
+- **Search & Filter**: Find specific logs by text, level, or category
+- **Export Capability**: Share logs for debugging or support
+- **Real-time Updates**: Logs update automatically as you use the app
+
+### Access Logs
+
+1. Open the app's drawer menu
+2. Select "Application Logs"
+3. Browse, search, and filter logs as needed
+4. Use the "Export" button to share logs
+5. Use the "Clear" button to remove all logs
+
+### Log Categories
+
+- **SMS**: SMS listening, receiving, and processing activities
+- **API**: API connection tests and SMS forwarding requests
+- **PERMISSIONS**: Permission requests and status checks
+- **STORAGE**: Settings and data storage operations
+- **FILTERS**: Contact filtering decisions and updates
+- **SYSTEM**: App initialization and status checks
+- **USER**: User interface notifications and interactions
+
+### Privacy Note
+
+Logs are stored locally on your device and never sent anywhere unless you explicitly export them. SMS content is logged for debugging but can be cleared at any time.
+
+## �📄 License
 
 This project is licensed under the 0BSD License.
 

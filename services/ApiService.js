@@ -1,3 +1,5 @@
+import LoggingService, { LOG_LEVELS, LOG_CATEGORIES } from './LoggingService';
+
 /**
  * API utility functions for SMS to API communication
  */
@@ -10,30 +12,43 @@ export class ApiService {
    */
   static async testConnection(endpoint, apiKey) {
     try {
+      await LoggingService.info(LOG_CATEGORIES.API, 'Testing API connection', { endpoint });
+      
       const response = await fetch(endpoint, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
-          'User-Agent': 'SMS-to-API-App/1.0.0',
+          'User-Agent': 'SMS-to-API-App/1.0.1',
         },
         timeout: 10000, // 10 second timeout
       });
 
-      return {
+      const result = {
         success: response.ok,
         status: response.status,
         statusText: response.statusText,
         message: response.ok ? 'Connection successful' : `HTTP ${response.status}: ${response.statusText}`,
       };
+
+      if (response.ok) {
+        await LoggingService.success(LOG_CATEGORIES.API, 'API connection test successful', result);
+      } else {
+        await LoggingService.warn(LOG_CATEGORIES.API, 'API connection test failed', result);
+      }
+
+      return result;
     } catch (error) {
-      return {
+      const errorResult = {
         success: false,
         status: 0,
         statusText: 'Connection Error',
         message: error.message || 'Failed to connect to API endpoint',
         error: error.name,
       };
+
+      await LoggingService.error(LOG_CATEGORIES.API, 'API connection test error', errorResult);
+      return errorResult;
     }
   }
 
@@ -56,12 +71,19 @@ export class ApiService {
         ...additionalData,
       };
 
+      await LoggingService.debug(LOG_CATEGORIES.API, 'Sending SMS to API', {
+        endpoint,
+        to,
+        messageLength: message.length,
+        hasAdditionalData: Object.keys(additionalData).length > 0
+      });
+
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
-          'User-Agent': 'SMS-to-API-App/1.0.0',
+          'User-Agent': 'SMS-to-API-App/1.0.1',
         },
         body: JSON.stringify(payload),
         timeout: 15000, // 15 second timeout
@@ -69,7 +91,7 @@ export class ApiService {
 
       const responseData = await response.json().catch(() => ({}));
 
-      return {
+      const result = {
         success: response.ok,
         status: response.status,
         statusText: response.statusText,
@@ -78,8 +100,25 @@ export class ApiService {
           ? 'SMS sent successfully' 
           : `Failed to send SMS: ${response.status} ${response.statusText}`,
       };
+
+      if (response.ok) {
+        await LoggingService.success(LOG_CATEGORIES.API, 'SMS sent to API successfully', {
+          to,
+          status: response.status,
+          responseData: Object.keys(responseData).length > 0 ? responseData : 'No response data'
+        });
+      } else {
+        await LoggingService.error(LOG_CATEGORIES.API, 'Failed to send SMS to API', {
+          to,
+          status: response.status,
+          statusText: response.statusText,
+          responseData
+        });
+      }
+
+      return result;
     } catch (error) {
-      return {
+      const errorResult = {
         success: false,
         status: 0,
         statusText: 'Network Error',
@@ -87,6 +126,14 @@ export class ApiService {
         message: error.message || 'Failed to send SMS',
         error: error.name,
       };
+
+      await LoggingService.error(LOG_CATEGORIES.API, 'SMS send request failed', {
+        to,
+        error: error.message,
+        errorName: error.name
+      });
+
+      return errorResult;
     }
   }
 
