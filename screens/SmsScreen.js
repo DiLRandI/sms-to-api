@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import SmsService from '../services/SmsService';
 import useApiSettings from '../hooks/useApiSettings';
+import PersistentServiceCard from '../components/PersistentServiceCard';
 
 const SmsScreen = () => {
   const [isListening, setIsListening] = useState(false);
@@ -205,6 +206,19 @@ const SmsScreen = () => {
         )}
       </View>
 
+      {/* Persistent Background Service */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>🚀 Enhanced Background Service</Text>
+        <Text style={styles.subtitle2}>
+          Keep SMS forwarding active even when app is completely closed
+        </Text>
+        
+        <PersistentServiceCard 
+          isConfigured={isConfigured()}
+          hasPermission={hasPermission}
+        />
+      </View>
+
       {/* Actions */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Actions</Text>
@@ -387,6 +401,134 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#1976D2',
     lineHeight: 20,
+  },
+  subtitle2: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  persistentCard: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 12,
+    padding: 20,
+    marginTop: 10,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  persistentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  persistentIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  persistentInfo: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  persistentTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  persistentDesc: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
+  },
+  persistentStats: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 15,
+    justifyContent: 'space-around',
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#007AFF',
+  },
+  persistentActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  persistentButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginRight: 10,
+  },
+  startButton: {
+    backgroundColor: '#34C759',
+  },
+  stopButton: {
+    backgroundColor: '#FF3B30',
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+  },
+  persistentButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  refreshButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#007AFF',
+  },
+  persistentFeatures: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 15,
+    marginTop: 10,
+  },
+  featuresTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  featureItem: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
+    marginBottom: 2,
   },
 });
 

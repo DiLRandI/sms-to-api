@@ -5,11 +5,12 @@ import ApiService from './ApiService';
 import StorageService from './StorageService';
 import ContactFilterService from './ContactFilterService';
 import LoggingService, { LOG_LEVELS, LOG_CATEGORIES } from './LoggingService';
-import BackgroundServiceManager from './BackgroundServiceManager';
+import PersistentSmsService from './PersistentSmsService';
 
 /**
  * SMS Service for handling incoming SMS messages on Android
  * Professional implementation with proper permissions and error handling
+ * Uses PersistentSmsService for enhanced background operation
  */
 export class SmsService {
   static subscription = null;
@@ -238,14 +239,6 @@ export class SmsService {
         return false;
       }
 
-      // Initialize background services for reliable SMS processing
-      await LoggingService.info(LOG_CATEGORIES.SMS, 'Initializing background services for SMS processing');
-      const backgroundInitialized = await BackgroundServiceManager.initialize();
-      
-      if (!backgroundInitialized) {
-        await LoggingService.warn(LOG_CATEGORIES.SMS, 'Background services failed to initialize, continuing with foreground only');
-      }
-
       // Start SMS listening with background-capable library
       this.subscription = SmsListener.addListener(message => {
         this.handleIncomingSms(message, apiSettings);
@@ -257,7 +250,6 @@ export class SmsService {
       await this.saveListenerState(true);
       
       await LoggingService.success(LOG_CATEGORIES.SMS, 'SMS listener started with background-capable library', {
-        backgroundServiceEnabled: backgroundInitialized,
         backgroundLibrarySupport: true,
         silentRestore
       });
@@ -267,7 +259,7 @@ export class SmsService {
         
         Alert.alert(
           'SMS Listener Active',
-          `Now listening for incoming SMS messages. They will be forwarded to your configured API endpoint.\n\n✅ ENHANCED BACKGROUND SUPPORT - Using background-capable SMS library that works even when app is closed.\n\n${backgroundInitialized ? '✅ Additional background queue processing enabled for extra reliability.' : '⚠️ Background queue processing not available - relying on library background support.'}`,
+          `Now listening for incoming SMS messages. They will be forwarded to your configured API endpoint.\n\n✅ ENHANCED BACKGROUND SUPPORT - Using background-capable SMS library that works even when app is closed.\n\nFor 24/7 operation when app is completely closed, use the Persistent Service option.`,
           [{ text: 'OK', style: 'default' }]
         );
       }
@@ -320,6 +312,130 @@ export class SmsService {
   }
 
   /**
+   * Start persistent background service for SMS listening
+   * This service will continue running even when the app is completely closed
+   * @returns {Promise<boolean>} Success status
+   */
+  static async startPersistentService() {
+    try {
+      await LoggingService.info(LOG_CATEGORIES.SMS, 'Starting persistent SMS background service');
+
+      // Check permissions first
+      const hasPermission = await this.checkSmsPermissions();
+      if (!hasPermission) {
+        const granted = await this.requestSmsPermissions();
+        if (!granted) {
+          throw new Error('SMS permissions required for persistent service');
+        }
+      }
+
+      // Check API configuration
+      const apiSettings = await StorageService.getApiSettings();
+      if (!apiSettings.endpoint || !apiSettings.apiKey) {
+        throw new Error('API configuration required for persistent service');
+      }
+
+      // Initialize and start persistent service
+      await PersistentSmsService.initialize();
+      const started = await PersistentSmsService.startPersistentService();
+
+      if (started) {
+        await LoggingService.success(LOG_CATEGORIES.SMS, 'Persistent SMS service started successfully');
+        
+        Alert.alert(
+          'Persistent SMS Service Started',
+          '🚀 Enhanced Background Service Active!\n\n' +
+          '✅ SMS listening will continue even when app is completely closed\n' +
+          '✅ Persistent foreground service with notification\n' +
+          '✅ Automatic message queuing and retry\n' +
+          '✅ Real-time API forwarding\n\n' +
+          'You can now close the app completely and SMS forwarding will continue to work.',
+          [{ text: 'Great!', style: 'default' }]
+        );
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      await LoggingService.error(LOG_CATEGORIES.SMS, 'Failed to start persistent SMS service', { error: error.message });
+      
+      Alert.alert(
+        'Persistent Service Error',
+        `Failed to start persistent background service:\n\n${error.message}\n\nYou can still use the regular SMS listener, but it may not work when the app is completely closed.`,
+        [{ text: 'OK', style: 'default' }]
+      );
+      
+      return false;
+    }
+  }
+
+  /**
+   * Stop persistent background service
+   * @returns {Promise<boolean>} Success status
+   */
+  static async stopPersistentService() {
+    try {
+      await LoggingService.info(LOG_CATEGORIES.SMS, 'Stopping persistent SMS background service');
+      
+      const stopped = await PersistentSmsService.stopPersistentService();
+      
+      if (stopped) {
+        await LoggingService.success(LOG_CATEGORIES.SMS, 'Persistent SMS service stopped successfully');
+        
+        Alert.alert(
+          'Persistent Service Stopped',
+          'The persistent background SMS service has been stopped.\n\nSMS forwarding will no longer work when the app is closed.',
+          [{ text: 'OK', style: 'default' }]
+        );
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      await LoggingService.error(LOG_CATEGORIES.SMS, 'Failed to stop persistent SMS service', { error: error.message });
+      
+      Alert.alert(
+        'Error',
+        `Failed to stop persistent service: ${error.message}`,
+        [{ text: 'OK', style: 'default' }]
+      );
+      
+      return false;
+    }
+  }
+
+  /**
+   * Get status of both regular and persistent SMS services
+   * @returns {Promise<Object>} Service status information
+   */
+  static async getServiceStatus() {
+    try {
+      const regularStatus = {
+        isListening: this.isListening,
+        hasSubscription: !!this.subscription,
+        currentAppState: this.currentAppState,
+      };
+
+      const persistentStatus = await PersistentSmsService.getServiceStatus();
+      
+      return {
+        regular: regularStatus,
+        persistent: persistentStatus,
+        isAnyActive: this.isListening || persistentStatus.isRunning,
+      };
+    } catch (error) {
+      await LoggingService.error(LOG_CATEGORIES.SMS, 'Failed to get service status', { error: error.message });
+      return {
+        regular: { isListening: false, error: error.message },
+        persistent: { isRunning: false, error: error.message },
+        isAnyActive: false,
+      };
+    }
+  }
+
+  /**
    * Handle incoming SMS message
    * @param {Object} message - SMS message object
    * @param {Object} apiSettings - API configuration
@@ -361,7 +477,7 @@ export class SmsService {
         messageId: smsInfo.messageId,
         deviceInfo: {
           platform: Platform.OS,
-          appVersion: '1.2.0',
+          appVersion: '1.3.0',
           appState: currentAppState,
           processedWithBackgroundLibrary: true,
           libraryUsed: '@ernestbies/react-native-android-sms-listener'
@@ -397,10 +513,6 @@ export class SmsService {
         });
         console.log('SMS forwarded successfully:', result);
         this.showSuccessNotification(smsData);
-
-        // Also queue for backup processing (extra reliability)
-        await BackgroundServiceManager.queueSmsForProcessing(message);
-        await BackgroundServiceManager.markSmsAsProcessed(message);
       } else {
         await LoggingService.error(LOG_CATEGORIES.API, 'Failed to forward SMS via background library', {
           messageId: smsData.messageId,
@@ -410,10 +522,7 @@ export class SmsService {
           statusCode: result.statusCode
         });
         console.error('Failed to forward SMS:', result);
-        
-        // Queue for background retry
-        await BackgroundServiceManager.queueSmsForProcessing(message);
-        this.showErrorNotification(`SMS forwarding failed: ${result.message}. Queued for retry.`);
+        this.showErrorNotification(`SMS forwarding failed: ${result.message}. Consider using Persistent Service for reliable delivery.`);
       }
 
     } catch (error) {
@@ -424,15 +533,7 @@ export class SmsService {
         appState: AppState.currentState
       });
       console.error('Error handling SMS:', error);
-      
-      // Queue for background processing as fallback
-      try {
-        await BackgroundServiceManager.queueSmsForProcessing(message);
-      } catch (queueError) {
-        await LoggingService.error(LOG_CATEGORIES.SMS, 'Failed to queue SMS as fallback', { error: queueError.message });
-      }
-      
-      this.showErrorNotification('Failed to process SMS - queued for retry');
+      this.showErrorNotification('Failed to process SMS - use Persistent Service for reliable background processing');
     }
   }
 
