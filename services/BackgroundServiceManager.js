@@ -98,20 +98,25 @@ export class BackgroundServiceManager {
         return true;
       }
 
-      // Define the background task
-      TaskManager.defineTask(BACKGROUND_SMS_TASK, async ({ data, error }) => {
-        if (error) {
-          await LoggingService.error(LOG_CATEGORIES.SYSTEM, 'Background task error', { error: error.message });
-          return;
-        }
+      // Check if task is already defined (handles app restarts)
+      const isAlreadyDefined = TaskManager.isTaskDefined(BACKGROUND_SMS_TASK);
+      
+      if (!isAlreadyDefined) {
+        // Define the background task
+        TaskManager.defineTask(BACKGROUND_SMS_TASK, async ({ data, error }) => {
+          if (error) {
+            await LoggingService.error(LOG_CATEGORIES.SYSTEM, 'Background task error', { error: error.message });
+            return;
+          }
 
-        try {
-          await LoggingService.debug(LOG_CATEGORIES.SYSTEM, 'Background task executing');
-          await this.processPendingSms();
-        } catch (taskError) {
-          await LoggingService.error(LOG_CATEGORIES.SYSTEM, 'Background task execution failed', { error: taskError.message });
-        }
-      });
+          try {
+            await LoggingService.debug(LOG_CATEGORIES.SYSTEM, 'Background task executing - processing pending SMS');
+            await this.processPendingSms();
+          } catch (taskError) {
+            await LoggingService.error(LOG_CATEGORIES.SYSTEM, 'Background task execution failed', { error: taskError.message });
+          }
+        });
+      }
 
       this.isRegistered = true;
       await LoggingService.success(LOG_CATEGORIES.SYSTEM, 'Background task registered successfully');
@@ -130,13 +135,25 @@ export class BackgroundServiceManager {
       const status = await BackgroundFetch.getStatusAsync();
       
       if (status === BackgroundFetch.BackgroundFetchStatus.Available) {
-        await BackgroundFetch.registerTaskAsync(BACKGROUND_SMS_TASK, {
-          minimumInterval: 1000 * 60 * 1, // Check every minute (minimum allowed by most Android versions)
-          stopOnTerminate: false,
-          startOnBoot: true,
-        });
+        // Check if already registered
+        const isRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_SMS_TASK);
         
-        await LoggingService.success(LOG_CATEGORIES.SYSTEM, 'Background fetch registered successfully');
+        if (!isRegistered) {
+          await BackgroundFetch.registerTaskAsync(BACKGROUND_SMS_TASK, {
+            minimumInterval: 1000 * 15, // Check every 15 seconds (more frequent than default)
+            stopOnTerminate: false, // Keep running when app is terminated
+            startOnBoot: true, // Start on device boot
+          });
+          
+          await LoggingService.success(LOG_CATEGORIES.SYSTEM, 'Background fetch registered successfully', {
+            minimumInterval: '15 seconds',
+            stopOnTerminate: false,
+            startOnBoot: true
+          });
+        } else {
+          await LoggingService.debug(LOG_CATEGORIES.SYSTEM, 'Background fetch already registered');
+        }
+        
         return true;
       } else {
         await LoggingService.warn(LOG_CATEGORIES.SYSTEM, 'Background fetch not available', { status });
@@ -184,12 +201,56 @@ export class BackgroundServiceManager {
         queueLength: queue.length
       });
 
-      // Try to process immediately if app is active
-      this.processPendingSms();
+      // Schedule background processing (don't process immediately to avoid conflicts)
+      setTimeout(() => {
+        this.processPendingSms();
+      }, 1000);
 
       return true;
     } catch (error) {
       await LoggingService.error(LOG_CATEGORIES.SMS, 'Failed to queue SMS for processing', { error: error.message });
+      return false;
+    }
+  }
+
+  /**
+   * Mark SMS as processed (to prevent duplicate processing)
+   * @param {Object} message - SMS message object to mark as processed
+   */
+  static async markSmsAsProcessed(message) {
+    try {
+      const queueJson = await AsyncStorage.getItem(SMS_QUEUE_KEY);
+      if (!queueJson) {
+        return false;
+      }
+
+      const queue = JSON.parse(queueJson);
+      
+      // Find the SMS in queue by timestamp and phone number
+      const smsIndex = queue.findIndex(sms => 
+        sms.originatingAddress === message.originatingAddress &&
+        Math.abs(new Date(sms.timestamp).getTime() - new Date().getTime()) < 5000 && // Within 5 seconds
+        !sms.processed
+      );
+
+      if (smsIndex >= 0) {
+        queue[smsIndex].processed = true;
+        queue[smsIndex].processedInForeground = true;
+        
+        // Save updated queue
+        await AsyncStorage.setItem(SMS_QUEUE_KEY, JSON.stringify(queue));
+        
+        await LoggingService.debug(LOG_CATEGORIES.SMS, 'SMS marked as processed (foreground)', {
+          smsId: queue[smsIndex].id,
+          from: message.originatingAddress
+        });
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      await LoggingService.error(LOG_CATEGORIES.SMS, 'Failed to mark SMS as processed', { error: error.message });
       return false;
     }
   }
@@ -209,6 +270,7 @@ export class BackgroundServiceManager {
       const pendingSms = queue.filter(sms => !sms.processed);
 
       if (pendingSms.length === 0) {
+        await LoggingService.debug(LOG_CATEGORIES.SMS, 'No pending SMS to process in background');
         return; // No pending SMS to process
       }
 
@@ -355,10 +417,25 @@ export class BackgroundServiceManager {
   static async stop() {
     try {
       await BackgroundFetch.unregisterTaskAsync(BACKGROUND_SMS_TASK);
+      this.isRegistered = false;
       await LoggingService.info(LOG_CATEGORIES.SYSTEM, 'Background services stopped');
       return true;
     } catch (error) {
       await LoggingService.error(LOG_CATEGORIES.SYSTEM, 'Failed to stop background services', { error: error.message });
+      return false;
+    }
+  }
+
+  /**
+   * Force process pending SMS (for manual triggering)
+   */
+  static async forceProcessPendingSms() {
+    try {
+      await LoggingService.info(LOG_CATEGORIES.SMS, 'Manually triggering background SMS processing');
+      await this.processPendingSms();
+      return true;
+    } catch (error) {
+      await LoggingService.error(LOG_CATEGORIES.SMS, 'Failed to force process pending SMS', { error: error.message });
       return false;
     }
   }

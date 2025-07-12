@@ -134,16 +134,23 @@ const BackgroundServiceScreen = () => {
     try {
       await LoggingService.info(LOG_CATEGORIES.SMS, 'Manual SMS processing triggered by user');
       
-      // Trigger immediate processing
-      await BackgroundServiceManager.processPendingSms();
+      // Trigger immediate processing using the new force method
+      const result = await BackgroundServiceManager.forceProcessPendingSms();
       
-      Alert.alert('Processing', 'Manual SMS processing triggered. Check logs for results.');
+      if (result) {
+        Alert.alert('Processing', 'Manual SMS processing triggered successfully. Check logs for results.');
+        await LoggingService.success(LOG_CATEGORIES.SMS, 'Manual SMS processing completed successfully');
+      } else {
+        Alert.alert('Failed', 'Failed to trigger SMS processing. Check logs for details.');
+        await LoggingService.error(LOG_CATEGORIES.SMS, 'Manual SMS processing failed');
+      }
       
       // Refresh status after a short delay
       setTimeout(async () => {
         await loadStatus();
       }, 2000);
     } catch (error) {
+      await LoggingService.error(LOG_CATEGORIES.SMS, 'Error in manual SMS processing', { error: error.message });
       Alert.alert('Error', 'Failed to process SMS: ' + error.message);
     }
   };
