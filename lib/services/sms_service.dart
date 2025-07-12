@@ -1,10 +1,14 @@
-import 'package:sms_advanced/sms_advanced.dart';
+import 'dart:async';
+import 'package:flutter_sms_inbox/flutter_sms_inbox.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'api_service.dart';
 
 class SmsService {
-  static final SmsReceiver _receiver = SmsReceiver();
+  static final SmsQuery _query = SmsQuery();
   static final ApiService _apiService = ApiService();
+  static Timer? _pollingTimer;
+  static DateTime? _lastCheckedTime;
+  static Set<String> _processedSmsIds = {};
 
   // Request SMS permissions
   static Future<bool> requestPermissions() async {
@@ -17,36 +21,77 @@ class SmsService {
     return await Permission.sms.isGranted;
   }
 
-  // Initialize SMS listener
+  // Initialize SMS listener with polling approach
   static Future<void> initializeSmsListener() async {
     if (!await hasPermissions()) {
       print('SMS permissions not granted');
       return;
     }
 
-    // Listen for incoming SMS
-    _receiver.onSmsReceived!.listen(onSmsReceived);
-    print('SMS listener initialized');
+    // Initialize last checked time to now
+    _lastCheckedTime = DateTime.now();
+
+    // Start polling for new SMS every 5 seconds
+    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      _checkForNewSms();
+    });
+
+    print('SMS listener initialized with polling');
+  }
+
+  // Stop SMS listener
+  static void stopSmsListener() {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
+    print('SMS listener stopped');
+  }
+
+  // Check for new SMS messages
+  static Future<void> _checkForNewSms() async {
+    try {
+      if (!await hasPermissions()) return;
+
+      final messages = await _query.querySms(
+        kinds: [SmsQueryKind.inbox],
+        count: 10, // Check last 10 messages
+      );
+
+      final newMessages = messages.where((message) {
+        // Check if message is newer than last check and not already processed
+        final messageTime = message.date ?? DateTime.now();
+        final isNew =
+            _lastCheckedTime != null && messageTime.isAfter(_lastCheckedTime!);
+        final notProcessed = !_processedSmsIds.contains(message.id.toString());
+        return isNew && notProcessed;
+      }).toList();
+
+      for (final message in newMessages) {
+        await onSmsReceived(message);
+        _processedSmsIds.add(message.id.toString());
+      }
+
+      _lastCheckedTime = DateTime.now();
+    } catch (e) {
+      print('Error checking for new SMS: $e');
+    }
   }
 
   // Handle incoming SMS
   static Future<void> onSmsReceived(SmsMessage message) async {
-    print('New SMS received from ${message.sender}: ${message.body}');
+    print('New SMS received from ${message.address}: ${message.body}');
 
     try {
       // Forward SMS to API
       final timestamp = message.date ?? DateTime.now();
 
       final success = await _apiService.forwardSms(
-        sender: message.sender ?? 'Unknown',
+        sender: message.address ?? 'Unknown',
         message: message.body ?? '',
         timestamp: timestamp,
       );
 
       if (success) {
         print('SMS forwarded successfully');
-        // Note: In a real app, you'd want to use a proper state management
-        // solution to update the counter across the app
       } else {
         print('Failed to forward SMS');
       }
@@ -62,15 +107,12 @@ class SmsService {
     }
 
     try {
-      final SmsQuery query = SmsQuery();
-      final messages = await query.getAllSms;
-
-      // Sort by date and limit
-      messages.sort(
-        (a, b) =>
-            (b.date ?? DateTime.now()).compareTo(a.date ?? DateTime.now()),
+      final messages = await _query.querySms(
+        kinds: [SmsQueryKind.inbox],
+        count: limit,
       );
-      return messages.take(limit).toList();
+
+      return messages;
     } catch (e) {
       print('Error getting SMS history: $e');
       return [];

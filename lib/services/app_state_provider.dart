@@ -93,6 +93,8 @@ class AppStateProvider extends ChangeNotifier {
 
     if (_isServiceEnabled) {
       await SmsService.initializeSmsListener();
+    } else {
+      SmsService.stopSmsListener();
     }
 
     final prefs = await SharedPreferences.getInstance();
