@@ -21,11 +21,6 @@ const CustomDrawerContent = ({ navigation, state }) => {
       icon: 'filter-outline',
     },
     {
-      name: 'Background Service',
-      routeName: 'BackgroundService',
-      icon: 'cloud-outline',
-    },
-    {
       name: 'Application Logs',
       routeName: 'Logs',
       icon: 'document-text-outline',

@@ -12,7 +12,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import SmsService from '../services/SmsService';
 import useApiSettings from '../hooks/useApiSettings';
-import PersistentServiceCard from '../components/PersistentServiceCard';
 
 const SmsScreen = () => {
   const [isListening, setIsListening] = useState(false);
@@ -239,6 +238,156 @@ const SmsScreen = () => {
         </Text>
       </View>
     </ScrollView>
+  );
+};
+
+// Persistent Service Card Component
+const PersistentServiceCard = ({ isConfigured, hasPermission }) => {
+  const [persistentStatus, setPersistentStatus] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    checkPersistentStatus();
+  }, []);
+
+  const checkPersistentStatus = async () => {
+    try {
+      const status = await SmsService.getServiceStatus();
+      setPersistentStatus(status.persistent);
+    } catch (error) {
+      console.error('Error checking persistent status:', error);
+    }
+  };
+
+  const handleStartPersistent = async () => {
+    setIsLoading(true);
+    try {
+      const success = await SmsService.startPersistentService();
+      if (success) {
+        await checkPersistentStatus();
+      }
+    } catch (error) {
+      console.error('Error starting persistent service:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleStopPersistent = async () => {
+    setIsLoading(true);
+    try {
+      const success = await SmsService.stopPersistentService();
+      if (success) {
+        await checkPersistentStatus();
+      }
+    } catch (error) {
+      console.error('Error stopping persistent service:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const isDisabled = !isConfigured || !hasPermission || isLoading;
+  const isRunning = persistentStatus?.isRunning || false;
+
+  return (
+    <View style={styles.persistentCard}>
+      <View style={styles.persistentHeader}>
+        <View style={styles.persistentIcon}>
+          <Ionicons 
+            name={isRunning ? "rocket" : "rocket-outline"} 
+            size={20} 
+            color={isRunning ? "#34C759" : "#666"} 
+          />
+        </View>
+        <View style={styles.persistentInfo}>
+          <Text style={styles.persistentTitle}>
+            Persistent Service {isRunning ? "ACTIVE" : "INACTIVE"}
+          </Text>
+          <Text style={styles.persistentDesc}>
+            {isRunning 
+              ? `Running since ${persistentStatus?.startedAt ? new Date(persistentStatus.startedAt).toLocaleTimeString() : 'unknown'}`
+              : "Not running - SMS listening stops when app closes"
+            }
+          </Text>
+        </View>
+      </View>
+
+      {persistentStatus && isRunning && (
+        <View style={styles.persistentStats}>
+          <View style={styles.statItem}>
+            <Text style={styles.statLabel}>Processed</Text>
+            <Text style={styles.statValue}>{persistentStatus.processedCount || 0}</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statLabel}>Queued</Text>
+            <Text style={styles.statValue}>{persistentStatus.queuedCount || 0}</Text>
+          </View>
+        </View>
+      )}
+
+      <View style={styles.persistentActions}>
+        {!isRunning ? (
+          <TouchableOpacity
+            style={[styles.persistentButton, styles.startButton, isDisabled && styles.disabledButton]}
+            onPress={handleStartPersistent}
+            disabled={isDisabled}
+          >
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="play" size={16} color="#fff" />
+                <Text style={styles.persistentButtonText}>Start Persistent Service</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.persistentButton, styles.stopButton]}
+            onPress={handleStopPersistent}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="stop" size={16} color="#fff" />
+                <Text style={styles.persistentButtonText}>Stop Persistent Service</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity
+          style={styles.refreshButton}
+          onPress={checkPersistentStatus}
+          disabled={isLoading}
+        >
+          <Ionicons name="refresh" size={16} color="#007AFF" />
+        </TouchableOpacity>
+      </View>
+
+      {!isConfigured && (
+        <Text style={styles.warningText}>
+          ⚠️ Configure API settings first
+        </Text>
+      )}
+      
+      {!hasPermission && (
+        <Text style={styles.warningText}>
+          ⚠️ SMS permissions required
+        </Text>
+      )}
+
+      <View style={styles.persistentFeatures}>
+        <Text style={styles.featuresTitle}>✨ Persistent Service Features:</Text>
+        <Text style={styles.featureItem}>• Works when app is completely closed</Text>
+        <Text style={styles.featureItem}>• Automatic message queuing and retry</Text>
+        <Text style={styles.featureItem}>• Real-time status notifications</Text>
+        <Text style={styles.featureItem}>• Enhanced reliability for 24/7 monitoring</Text>
+      </View>
+    </View>
   );
 };
 
