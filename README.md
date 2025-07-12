@@ -158,7 +158,7 @@ When an SMS is received, the app will send a POST request to your configured end
     "messageId": "sms_1625998200000_abc123def",
     "deviceInfo": {
       "platform": "android",
-      "appVersion": "1.1.0"
+      "appVersion": "1.1.1"
     }
   },
   "direction": "incoming"
@@ -169,7 +169,7 @@ When an SMS is received, the app will send a POST request to your configured end
 
 - `Content-Type: application/json`
 - `Authorization: Bearer YOUR_API_KEY`
-- `User-Agent: SMS-to-API-App/1.1.0`
+- `User-Agent: SMS-to-API-App/1.1.1`
 
 ## 🛠 Technical Implementation
 

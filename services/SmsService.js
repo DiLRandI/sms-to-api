@@ -410,7 +410,7 @@ export class SmsService {
         messageId: this.generateMessageId(),
         deviceInfo: {
           platform: Platform.OS,
-          appVersion: '1.1.0',
+          appVersion: '1.1.1',
           processedInForeground: true,
         },
       };

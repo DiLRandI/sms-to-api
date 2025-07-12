@@ -308,7 +308,7 @@ export class BackgroundServiceManager {
             messageId: sms.id,
             deviceInfo: {
               platform: Platform.OS,
-              appVersion: '1.1.0',
+              appVersion: '1.1.1',
               processedInBackground: true,
             },
           };
