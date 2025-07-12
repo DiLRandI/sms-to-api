@@ -14,16 +14,19 @@ A Flutter app that automatically reads incoming SMS messages and forwards them t
 ## Setup Instructions
 
 ### 1. Prerequisites
+
 - Flutter SDK (3.8.1 or higher)
 - Android device or emulator (iOS not supported due to SMS limitations)
 - API endpoint to receive SMS data
 
 ### 2. Installation
+
 1. Clone this repository
 2. Run `flutter pub get` to install dependencies
 3. Build and install the app: `flutter run`
 
 ### 3. Configuration
+
 1. Open the app and tap the settings icon
 2. Enter your API endpoint URL (e.g., `https://your-api.com/webhook`)
 3. Optionally add an API key for authentication
@@ -31,6 +34,7 @@ A Flutter app that automatically reads incoming SMS messages and forwards them t
 5. Save the configuration
 
 ### 4. Usage
+
 1. Grant SMS permissions when prompted
 2. Enable the service by tapping "Start Service"
 3. The app will now forward all incoming SMS to your API
@@ -70,6 +74,7 @@ Authorization: Bearer your-api-key-here
 ## Technical Details
 
 ### Dependencies
+
 - `telephony`: SMS reading and background listening
 - `permission_handler`: Managing app permissions
 - `http`: Making API requests
@@ -77,23 +82,27 @@ Authorization: Bearer your-api-key-here
 - `provider`: State management
 
 ### Background Processing
+
 The app registers a background SMS receiver that continues to work even when the app is closed. This ensures all SMS messages are captured and forwarded.
 
 ## Troubleshooting
 
 ### SMS Not Being Forwarded
+
 1. Ensure SMS permissions are granted
 2. Check that the service is enabled (green status)
 3. Verify your API endpoint is accessible
 4. Check the app logs for error messages
 
 ### API Connection Issues
+
 1. Test the connection using the "Test Connection" button
 2. Verify your API endpoint accepts POST requests
 3. Check if your endpoint requires specific headers or authentication
 4. Ensure your device has internet connectivity
 
 ### Permissions Denied
+
 1. Go to Android Settings > Apps > SMS to API > Permissions
 2. Enable SMS permissions manually
 3. Restart the app
