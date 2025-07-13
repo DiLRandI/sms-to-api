@@ -38,20 +38,38 @@ class SmsForwardingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d(TAG, "onStartCommand called with action: ${intent?.action}")
+        
         when (intent?.action) {
             ACTION_START_SERVICE -> {
+                Log.d(TAG, "Starting foreground service...")
                 startForegroundService()
                 logToSharedPrefs("info", "SMS Forwarding Service started", "Background service is now active")
             }
             ACTION_STOP_SERVICE -> {
+                Log.d(TAG, "Stopping foreground service...")
                 stopForegroundService()
                 logToSharedPrefs("info", "SMS Forwarding Service stopped", "Background service is now inactive")
             }
             ACTION_PROCESS_SMS -> {
+                Log.d(TAG, "Processing SMS action received")
+                // Ensure service is running in foreground for SMS processing
+                if (!isServiceRunning()) {
+                    Log.d(TAG, "Service not in foreground, starting foreground mode...")
+                    startForegroundService()
+                }
                 processPendingSms()
+            }
+            else -> {
+                Log.w(TAG, "Unknown action received: ${intent?.action}")
             }
         }
         return START_STICKY // Restart service if killed by system
+    }
+
+    private fun isServiceRunning(): Boolean {
+        // Check if service is already running in foreground
+        return true // For now, assume it's running if we get here
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -74,22 +92,32 @@ class SmsForwardingService : Service() {
     }
 
     private fun processPendingSms() {
+        Log.d(TAG, "processPendingSms() called")
         serviceScope.launch {
             try {
-                Log.d(TAG, "Processing pending SMS messages")
+                Log.d(TAG, "Processing pending SMS messages in coroutine")
                 
                 // Get the latest SMS messages
                 val smsMessages = getLatestSmsMessages()
+                Log.d(TAG, "Found ${smsMessages.size} SMS messages to process")
                 
                 for (sms in smsMessages) {
+                    Log.d(TAG, "Processing SMS from ${sms.address}: ${sms.body.take(50)}...")
                     if (shouldForwardMessage(sms)) {
+                        Log.d(TAG, "SMS passed filtering, forwarding to API...")
                         forwardSmsToApi(sms)
                         updateMessageCount()
+                        Log.d(TAG, "SMS forwarded successfully")
+                    } else {
+                        Log.d(TAG, "SMS filtered out by contact filtering")
+                        logToSharedPrefs("info", "SMS filtered out", "From: ${sms.address}")
                     }
                 }
                 
+                Log.d(TAG, "Finished processing all SMS messages")
+                
             } catch (e: Exception) {
-                Log.e(TAG, "Error processing SMS: ${e.message}")
+                Log.e(TAG, "Error processing SMS: ${e.message}", e)
                 logToSharedPrefs("error", "SMS processing failed", e.message ?: "Unknown error")
             }
         }
@@ -99,6 +127,9 @@ class SmsForwardingService : Service() {
         val messages = mutableListOf<SmsMessage>()
         
         try {
+            val lastProcessed = getLastProcessedTimestamp()
+            Log.d(TAG, "Looking for SMS messages newer than: $lastProcessed")
+            
             val cursor = contentResolver.query(
                 Telephony.Sms.CONTENT_URI,
                 arrayOf(
@@ -111,51 +142,74 @@ class SmsForwardingService : Service() {
                 "${Telephony.Sms.TYPE} = ? AND ${Telephony.Sms.DATE} > ?",
                 arrayOf(
                     Telephony.Sms.MESSAGE_TYPE_INBOX.toString(),
-                    getLastProcessedTimestamp().toString()
+                    lastProcessed.toString()
                 ),
                 "${Telephony.Sms.DATE} DESC LIMIT 10"
             )
 
             cursor?.use {
+                Log.d(TAG, "Cursor returned ${it.count} rows")
                 while (it.moveToNext()) {
                     val id = it.getLong(it.getColumnIndexOrThrow(Telephony.Sms._ID))
                     val address = it.getString(it.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)) ?: ""
                     val body = it.getString(it.getColumnIndexOrThrow(Telephony.Sms.BODY)) ?: ""
                     val date = it.getLong(it.getColumnIndexOrThrow(Telephony.Sms.DATE))
                     
+                    Log.d(TAG, "Found SMS: ID=$id, From=$address, Date=$date, Body=${body.take(50)}...")
                     messages.add(SmsMessage(id, address, body, date))
                 }
             }
             
             // Update last processed timestamp
             updateLastProcessedTimestamp(System.currentTimeMillis())
+            Log.d(TAG, "Updated last processed timestamp to: ${System.currentTimeMillis()}")
             
         } catch (e: Exception) {
-            Log.e(TAG, "Error reading SMS messages: ${e.message}")
+            Log.e(TAG, "Error reading SMS messages: ${e.message}", e)
+            logToSharedPrefs("error", "Failed to read SMS", e.message ?: "Unknown error")
         }
         
+        Log.d(TAG, "Returning ${messages.size} SMS messages")
         return messages
     }
 
     private fun shouldForwardMessage(sms: SmsMessage): Boolean {
         // Check if contact filtering is enabled
         val filterMode = sharedPrefs.getString("flutter.contact_filter_mode", "disabled") ?: "disabled"
+        Log.d(TAG, "Contact filter mode: $filterMode")
         
         if (filterMode == "disabled") {
+            Log.d(TAG, "Contact filtering disabled, forwarding message")
             return true
         }
         
         val contactsJson = sharedPrefs.getString("flutter.filtered_contacts", "[]") ?: "[]"
         val filteredContacts = parseContactsFromJson(contactsJson)
+        Log.d(TAG, "Filtered contacts: $filteredContacts")
         
         val normalizedSender = normalizePhoneNumber(sms.address)
-        val isInList = filteredContacts.any { normalizePhoneNumber(it) == normalizedSender }
+        Log.d(TAG, "Normalized sender: $normalizedSender")
         
-        return when (filterMode) {
-            "whitelist" -> isInList
-            "blacklist" -> !isInList
-            else -> true
+        val isInList = filteredContacts.any { normalizePhoneNumber(it) == normalizedSender }
+        Log.d(TAG, "Sender in filter list: $isInList")
+        
+        val shouldForward = when (filterMode) {
+            "whitelist" -> {
+                Log.d(TAG, "Whitelist mode: forwarding only if in list")
+                isInList
+            }
+            "blacklist" -> {
+                Log.d(TAG, "Blacklist mode: forwarding if NOT in list")
+                !isInList
+            }
+            else -> {
+                Log.d(TAG, "Unknown filter mode, defaulting to forward")
+                true
+            }
         }
+        
+        Log.d(TAG, "Should forward message: $shouldForward")
+        return shouldForward
     }
 
     private fun normalizePhoneNumber(number: String): String {

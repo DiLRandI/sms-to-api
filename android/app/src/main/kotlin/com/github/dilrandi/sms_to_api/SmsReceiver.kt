@@ -12,13 +12,34 @@ class SmsReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
+        Log.d(TAG, "onReceive called with action: ${intent.action}")
+        
         if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
-            Log.d(TAG, "SMS received, starting background service")
+            Log.d(TAG, "SMS_RECEIVED_ACTION detected - SMS received!")
+            
+            // Log SMS details for debugging
+            val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
+            if (messages != null && messages.isNotEmpty()) {
+                Log.d(TAG, "Found ${messages.size} SMS messages")
+                for (message in messages) {
+                    Log.d(TAG, "SMS from: ${message.originatingAddress}, body: ${message.messageBody}")
+                }
+            } else {
+                Log.w(TAG, "No SMS messages found in intent")
+            }
             
             // Start the SMS processing service
+            Log.d(TAG, "Starting SmsForwardingService...")
             val serviceIntent = Intent(context, SmsForwardingService::class.java)
             serviceIntent.action = SmsForwardingService.ACTION_PROCESS_SMS
-            context.startForegroundService(serviceIntent)
+            try {
+                context.startForegroundService(serviceIntent)
+                Log.d(TAG, "SmsForwardingService started successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start SmsForwardingService: ${e.message}")
+            }
+        } else {
+            Log.d(TAG, "Received intent with different action: ${intent.action}")
         }
     }
 }

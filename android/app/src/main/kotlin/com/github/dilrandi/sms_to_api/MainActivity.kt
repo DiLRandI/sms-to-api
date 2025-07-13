@@ -35,6 +35,10 @@ class MainActivity : FlutterActivity() {
                     requestBatteryOptimization()
                     result.success(true)
                 }
+                "testSmsProcessing" -> {
+                    testSmsProcessing()
+                    result.success(true)
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -71,5 +75,12 @@ class MainActivity : FlutterActivity() {
             intent.data = Uri.parse("package:$packageName")
             startActivity(intent)
         }
+    }
+
+    private fun testSmsProcessing() {
+        // Manually trigger SMS processing for testing
+        val serviceIntent = Intent(this, SmsForwardingService::class.java)
+        serviceIntent.action = SmsForwardingService.ACTION_PROCESS_SMS
+        startForegroundService(serviceIntent)
     }
 }

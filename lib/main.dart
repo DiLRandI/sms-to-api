@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/app_state_provider.dart';
+import 'services/logging_service.dart';
 import 'screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize app without logging to avoid startup crashes
+  // Migrate log data format for compatibility
+  try {
+    await LoggingService.migrateLogs();
+  } catch (e) {
+    // If migration fails, continue without logging to avoid startup crashes
+  }
+
   runApp(const MyApp());
 }
 

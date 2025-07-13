@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/services.dart';
 import '../services/app_state_provider.dart';
 import '../services/logging_service.dart';
+import '../services/persistent_sms_service.dart';
 import 'config_screen.dart';
 import 'contact_filter_screen.dart';
 import 'logs_screen.dart';
+import 'debug_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -247,7 +250,7 @@ class HomeScreen extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 8),
                             Expanded(
                               child: FutureBuilder<List<AppLog>>(
                                 future: LoggingService.getAllLogs(),
@@ -277,6 +280,80 @@ class HomeScreen extends StatelessWidget {
                               ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 8),
+                        // Test SMS Processing Button
+                        ElevatedButton.icon(
+                          onPressed: () => _testSmsProcessing(context),
+                          icon: const Icon(Icons.bug_report),
+                          label: const Text('Test SMS Processing'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.all(12),
+                            backgroundColor: Colors.orange,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // Debug buttons row
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () => _checkServiceStatus(context),
+                                icon: const Icon(Icons.info, size: 16),
+                                label: const Text('Check Status'),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.all(8),
+                                  backgroundColor: Colors.blue,
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () => _manualSmsCheck(context),
+                                icon: const Icon(Icons.refresh, size: 16),
+                                label: const Text('Manual Check'),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.all(8),
+                                  backgroundColor: Colors.green,
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        // Advanced debug button
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const DebugScreen(),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.build),
+                          label: const Text('Advanced Debug'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.all(12),
+                            backgroundColor: Colors.purple,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // Clear logs button
+                        ElevatedButton.icon(
+                          onPressed: () => _clearLogs(context),
+                          icon: const Icon(Icons.clear_all),
+                          label: const Text('Clear Logs'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.all(12),
+                            backgroundColor: Colors.red.shade300,
+                            foregroundColor: Colors.white,
+                          ),
                         ),
                       ],
                     ),
@@ -416,6 +493,173 @@ class HomeScreen extends StatelessWidget {
               Navigator.pop(context);
             },
             child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _testSmsProcessing(BuildContext context) async {
+    try {
+      await LoggingService.info(
+        'Test SMS Processing initiated',
+        'User pressed test button - calling Android service',
+      );
+
+      const platform = MethodChannel('sms_forwarding_service');
+      await platform.invokeMethod('testSmsProcessing');
+
+      await LoggingService.success(
+        'Test SMS Processing method called',
+        'Android service method invoked successfully',
+      );
+
+      // Also try the Dart service as a fallback
+      await LoggingService.info(
+        'Test SMS Processing - Dart fallback',
+        'Also calling Dart SMS service for comparison',
+      );
+
+      await PersistentSmsService.checkForNewSmsWithPersistence();
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Test SMS processing triggered (both Android & Dart) - check logs for results',
+            ),
+            backgroundColor: Colors.blue,
+          ),
+        );
+      }
+    } catch (e) {
+      await LoggingService.error(
+        'Failed to trigger test SMS processing',
+        'Error: $e',
+      );
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to trigger test: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _checkServiceStatus(BuildContext context) async {
+    try {
+      const platform = MethodChannel('sms_forwarding_service');
+      final isRunning = await platform.invokeMethod('isServiceRunning');
+
+      await LoggingService.info(
+        'Service status check',
+        'Android service running: $isRunning',
+      );
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isRunning == true
+                  ? 'Android background service is running'
+                  : 'Android background service is NOT running',
+            ),
+            backgroundColor: isRunning == true ? Colors.green : Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      await LoggingService.error('Failed to check service status', 'Error: $e');
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to check status: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _manualSmsCheck(BuildContext context) async {
+    try {
+      await LoggingService.info(
+        'Manual SMS check triggered',
+        'Checking for new SMS messages manually',
+      );
+
+      // Call the Dart persistent SMS service directly
+      await PersistentSmsService.checkForNewSmsWithPersistence();
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Manual SMS check completed - check logs for results',
+            ),
+            backgroundColor: Colors.blue,
+          ),
+        );
+      }
+    } catch (e) {
+      await LoggingService.error(
+        'Failed to perform manual SMS check',
+        'Error: $e',
+      );
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Manual check failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _clearLogs(BuildContext context) async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear Logs'),
+        content: const Text(
+          'Are you sure you want to clear all logs? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await LoggingService.clearLogs();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('All logs cleared successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to clear logs: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Clear'),
           ),
         ],
       ),

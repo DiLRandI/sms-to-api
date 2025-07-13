@@ -81,26 +81,83 @@ class LoggingService {
   static Future<List<AppLog>> getLogs() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final logsJson = prefs.getStringList(_logsKey) ?? [];
 
-      return logsJson.map((logString) {
-        final Map<String, dynamic> logMap = jsonDecode(logString);
-        return AppLog.fromJson(logMap);
-      }).toList();
+      // First try to get as StringList (Dart format)
+      final logsStringList = prefs.getStringList(_logsKey);
+      if (logsStringList != null) {
+        return logsStringList.map((logString) {
+          final Map<String, dynamic> logMap = jsonDecode(logString);
+          return AppLog.fromJson(logMap);
+        }).toList();
+      }
+
+      // If that fails, try to get as String (Android format)
+      final logsString =
+          prefs.getString('flutter.app_logs') ?? prefs.getString(_logsKey);
+      if (logsString != null && logsString.isNotEmpty && logsString != '[]') {
+        final List<dynamic> logsJsonArray = jsonDecode(logsString);
+        return logsJsonArray.map((logJson) {
+          // Handle both Map<String, dynamic> and String formats
+          final Map<String, dynamic> logMap = logJson is String
+              ? jsonDecode(logJson)
+              : logJson as Map<String, dynamic>;
+          return AppLog.fromJson(logMap);
+        }).toList();
+      }
+
+      return [];
     } catch (e) {
+      // If parsing fails, clear the corrupted data and return empty list
+      await _clearCorruptedLogs();
       return [];
     }
   }
 
-  // Retrieve all logs
+  // Retrieve all logs (alias for getLogs for backward compatibility)
   static Future<List<AppLog>> getAllLogs() async {
-    final prefs = await SharedPreferences.getInstance();
-    final logsJson = prefs.getStringList('app_logs') ?? [];
+    return getLogs();
+  }
 
-    return logsJson.map((logJson) {
-      final Map<String, dynamic> logMap = json.decode(logJson);
-      return AppLog.fromJson(logMap);
-    }).toList();
+  // Clear corrupted log data
+  static Future<void> _clearCorruptedLogs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_logsKey);
+      await prefs.remove('flutter.app_logs');
+    } catch (e) {
+      // Ignore errors when clearing
+    }
+  }
+
+  // Migrate and fix log data format
+  static Future<void> migrateLogs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Check if we have Android format logs that need migration
+      final androidLogs = prefs.getString('flutter.app_logs');
+      final dartLogs = prefs.getStringList(_logsKey);
+
+      if (androidLogs != null &&
+          androidLogs.isNotEmpty &&
+          androidLogs != '[]' &&
+          dartLogs == null) {
+        // We have Android logs but no Dart logs, migrate them
+        final List<dynamic> logsJsonArray = jsonDecode(androidLogs);
+        final logs = logsJsonArray.map((logJson) {
+          final Map<String, dynamic> logMap = logJson is String
+              ? jsonDecode(logJson)
+              : logJson as Map<String, dynamic>;
+          return AppLog.fromJson(logMap);
+        }).toList();
+
+        // Save in both formats
+        await _saveLogs(logs);
+      }
+    } catch (e) {
+      // If migration fails, clear everything and start fresh
+      await _clearCorruptedLogs();
+    }
   }
 
   // Get logs by level
@@ -119,14 +176,21 @@ class LoggingService {
   static Future<void> clearLogs() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_logsKey);
+    await prefs.remove('flutter.app_logs'); // Also clear Android format logs
   }
 
   // Save logs to storage
   static Future<void> _saveLogs(List<AppLog> logs) async {
     try {
       final prefs = await SharedPreferences.getInstance();
+
+      // Save in Dart format (StringList)
       final logsJson = logs.map((log) => jsonEncode(log.toJson())).toList();
       await prefs.setStringList(_logsKey, logsJson);
+
+      // Also save in Android format for compatibility
+      final androidLogsArray = logs.map((log) => log.toJson()).toList();
+      await prefs.setString('flutter.app_logs', jsonEncode(androidLogsArray));
     } catch (e) {
       // If we can't save logs, just continue silently
     }
