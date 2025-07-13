@@ -34,6 +34,11 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <service
+            android:name=".CounterService"
+            android:enabled="true"
+            android:exported="false" /> <!-- exported="false" means only your app can bind to it -->
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
