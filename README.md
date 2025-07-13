@@ -1,16 +1,61 @@
+
 # sms_to_api
 
-A new Flutter project.
+Forward SMS messages to a REST API using Flutter.
+
+## Overview
+
+`sms_to_api` is a Flutter application that listens for incoming SMS messages and forwards them to a configurable REST API endpoint. The app allows you to set the API URL and API key in the settings screen, and stores these securely using `shared_preferences`.
+
+## Features
+
+- Configure REST API endpoint and API key
+- Validate API connectivity
+- Store settings securely
+- Forward SMS messages to the API
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+### Prerequisites
 
-A few resources to get you started if this is your first Flutter project:
+- [Flutter SDK](https://docs.flutter.dev/get-started/install)
+- Android device or emulator
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+### Installation
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+1. Clone the repository:
+   ```sh
+   git clone <repo-url>
+   cd sms-to-api
+   ```
+2. Install dependencies:
+   ```sh
+   flutter pub get
+   ```
+3. Run the app:
+   ```sh
+   flutter run
+   ```
+
+## Configuration
+
+Go to the **Settings** screen in the app to set your API URL and API key. These are required for the app to forward SMS messages.
+
+## Project Structure
+
+- `lib/main.dart`: App entry point
+- `lib/screen/home.dart`: Home screen and main logic
+- `lib/screen/settings.dart`: Settings screen for API configuration
+- `lib/service/api_service.dart`: API service for sending SMS data
+- `lib/storage/settings/`: Settings storage and type definitions
+
+## Dependencies
+
+- `flutter`
+- `cupertino_icons`
+- `shared_preferences`
+- `http`
+
+## License
+
+This project is private and not published to pub.dev.
