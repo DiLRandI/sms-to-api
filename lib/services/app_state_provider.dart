@@ -27,20 +27,39 @@ class AppStateProvider extends ChangeNotifier {
   int get messageCount => _messageCount;
 
   AppStateProvider() {
-    _loadSettings();
-    _checkPermissions();
-    _startMessageCountUpdater();
+    _safeInitialize();
+  }
+
+  Future<void> _safeInitialize() async {
+    try {
+      await _loadSettings();
+      await _checkPermissions();
+      _startMessageCountUpdater();
+    } catch (e) {
+      // Set default values if initialization fails
+      _isServiceEnabled = false;
+      _hasPermissions = false;
+      _apiUrl = '';
+      _apiKey = '';
+      _messageCount = 0;
+      _statusMessage = 'Initialization failed';
+      setLoading(false);
+    }
   }
 
   Timer? _messageCountTimer;
 
   void _startMessageCountUpdater() {
-    _messageCountTimer?.cancel();
-    _messageCountTimer = Timer.periodic(const Duration(seconds: 5), (
-      timer,
-    ) async {
-      await _updateMessageCountFromService();
-    });
+    try {
+      _messageCountTimer?.cancel();
+      _messageCountTimer = Timer.periodic(const Duration(seconds: 10), (
+        timer,
+      ) async {
+        await _updateMessageCountFromService();
+      });
+    } catch (e) {
+      // Ignore timer initialization errors
+    }
   }
 
   Future<void> _updateMessageCountFromService() async {
@@ -63,24 +82,38 @@ class AppStateProvider extends ChangeNotifier {
 
   // Load settings from storage
   Future<void> _loadSettings() async {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    final prefs = await SharedPreferences.getInstance();
-    _isServiceEnabled = prefs.getBool('service_enabled') ?? false;
-    _messageCount = prefs.getInt('message_count') ?? 0;
+      final prefs = await SharedPreferences.getInstance();
+      _isServiceEnabled = prefs.getBool('service_enabled') ?? false;
+      _messageCount = prefs.getInt('message_count') ?? 0;
 
-    final config = await _apiService.getApiConfig();
-    _apiUrl = config['url'] ?? '';
-    _apiKey = config['key'] ?? '';
+      final config = await _apiService.getApiConfig();
+      _apiUrl = config['url'] ?? '';
+      _apiKey = config['key'] ?? '';
 
-    _updateStatusMessage();
-    setLoading(false);
+      _updateStatusMessage();
+      setLoading(false);
+    } catch (e) {
+      // Handle loading errors gracefully
+      _isServiceEnabled = false;
+      _messageCount = 0;
+      _apiUrl = '';
+      _apiKey = '';
+      setLoading(false);
+    }
   }
 
   // Check permissions
   Future<void> _checkPermissions() async {
-    _hasPermissions = await Permission.sms.isGranted;
-    notifyListeners();
+    try {
+      _hasPermissions = await Permission.sms.isGranted;
+      notifyListeners();
+    } catch (e) {
+      _hasPermissions = false;
+      notifyListeners();
+    }
   }
 
   // Request permissions
