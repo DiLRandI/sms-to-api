@@ -177,19 +177,395 @@ class _MyHomePageState extends State<MyHomePage> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Widget _buildStatusSection() {
+    return Column(
+      children: [
+        // Settings Configuration Status Card
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          child: Card(
+            elevation: _isSettingsConfigured ? 2 : 4,
+            color: _isSettingsConfigured
+                ? Colors.green.shade50
+                : Colors.red.shade50,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: _isSettingsConfigured
+                    ? Colors.green.shade200
+                    : Colors.red.shade200,
+                width: 1,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: _isSettingsConfigured
+                          ? Colors.green.shade100
+                          : Colors.red.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      _isSettingsConfigured ? Icons.check_circle : Icons.error,
+                      color: _isSettingsConfigured ? Colors.green : Colors.red,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Settings Configuration',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _isSettingsConfigured
+                              ? 'All settings are properly configured'
+                              : 'Please configure your API settings',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: _isSettingsConfigured
+                                    ? Colors.green.shade700
+                                    : Colors.red.shade700,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        // API Reachability Status Card
+        if (_isSettingsConfigured) ...[
+          const SizedBox(height: 12),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            child: Card(
+              elevation: _isApiReachable ? 2 : 4,
+              color: _isCheckingApi
+                  ? Colors.blue.shade50
+                  : _isApiReachable
+                  ? Colors.green.shade50
+                  : Colors.orange.shade50,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(
+                  color: _isCheckingApi
+                      ? Colors.blue.shade200
+                      : _isApiReachable
+                      ? Colors.green.shade200
+                      : Colors.orange.shade200,
+                  width: 1,
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _isCheckingApi
+                            ? Colors.blue.shade100
+                            : _isApiReachable
+                            ? Colors.green.shade100
+                            : Colors.orange.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: _isCheckingApi
+                          ? SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.blue,
+                                ),
+                              ),
+                            )
+                          : Icon(
+                              _isApiReachable
+                                  ? Icons.cloud_done
+                                  : Icons.cloud_off,
+                              color: _isApiReachable
+                                  ? Colors.green
+                                  : Colors.orange,
+                              size: 24,
+                            ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'API Endpoint Status',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _isCheckingApi
+                                ? 'Checking endpoint connectivity...'
+                                : _isApiReachable
+                                ? 'API endpoint is reachable and responding'
+                                : 'API endpoint is not reachable',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: _isCheckingApi
+                                      ? Colors.blue.shade700
+                                      : _isApiReachable
+                                      ? Colors.green.shade700
+                                      : Colors.orange.shade700,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildServiceInfoSection() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Service Information',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: Theme.of(context).primaryColor,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Status: $_serviceStatus',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(
+                  Icons.numbers,
+                  color: Theme.of(context).primaryColor,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Counter: $_counter',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildServiceControlSection() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Service Control',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _startService,
+                    icon: const Icon(Icons.play_arrow),
+                    label: const Text('Start'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _stopService,
+                    icon: const Icon(Icons.stop),
+                    label: const Text('Stop'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _bindService,
+                    icon: const Icon(Icons.link),
+                    label: const Text('Bind'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _unbindService,
+                    icon: const Icon(Icons.link_off),
+                    label: const Text('Unbind'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCounterActionsSection() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Counter Actions',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _incrementCounter,
+                icon: const Icon(Icons.add),
+                label: const Text('Increment Counter'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _getCounter,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Refresh Counter'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
+        elevation: 0,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
+        title: Text(
+          widget.title,
+          style: Theme.of(
+            context,
+          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded),
             onPressed: _checkSettings,
+            tooltip: 'Refresh Status',
+            style: IconButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+              foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
+          const SizedBox(width: 8),
           IconButton(
-            icon: const Icon(Icons.settings),
+            icon: const Icon(Icons.settings_rounded),
             onPressed: () async {
               await Navigator.push(
                 context,
@@ -198,152 +574,38 @@ class _MyHomePageState extends State<MyHomePage> {
               // Refresh the validation status when returning from settings
               _checkSettings();
             },
+            tooltip: 'Settings',
+            style: IconButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            ),
           ),
+          const SizedBox(width: 16),
         ],
       ),
-      body: Center(
+      backgroundColor: Theme.of(context).colorScheme.background,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            // Settings Configuration Status
-            Container(
-              padding: const EdgeInsets.all(16),
-              margin: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: _isSettingsConfigured
-                    ? Colors.green.shade100
-                    : Colors.red.shade100,
-                border: Border.all(
-                  color: _isSettingsConfigured ? Colors.green : Colors.red,
-                ),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _isSettingsConfigured ? Icons.check_circle : Icons.error,
-                    color: _isSettingsConfigured ? Colors.green : Colors.red,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _isSettingsConfigured
-                        ? 'Settings configured'
-                        : 'Please configure settings',
-                    style: TextStyle(
-                      color: _isSettingsConfigured ? Colors.green : Colors.red,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              child: Row(
-                children: [
-                  Text(
-                    'Service Status: $_serviceStatus',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Counter Value: $_counter',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: 40),
-                  ElevatedButton(
-                    onPressed: _startService,
-                    child: const Text('Start Service'),
-                  ),
-                  const SizedBox(height: 10),
-                  ElevatedButton(
-                    onPressed: _stopService,
-                    child: const Text('Stop Service'),
-                  ),
-                  const SizedBox(height: 20), // Added spacing
-                  ElevatedButton(
-                    onPressed: _bindService,
-                    child: const Text('Bind Service'),
-                  ),
-                  const SizedBox(height: 10),
-                  ElevatedButton(
-                    onPressed: _unbindService,
-                    child: const Text('Unbind Service'),
-                  ),
-                  const SizedBox(height: 10),
-                  ElevatedButton(
-                    onPressed: _incrementCounter,
-                    child: const Text('Increment Counter (App UI)'),
-                  ),
-                  const SizedBox(height: 10),
-                  ElevatedButton(
-                    onPressed: _getCounter,
-                    child: const Text('Get Counter (App UI)'),
-                  ),
-                ],
-              ),
-            ),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Status Cards Section
+            _buildStatusSection(),
 
-            // API Reachability Status
-            if (_isSettingsConfigured)
-              Container(
-                padding: const EdgeInsets.all(16),
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: _isCheckingApi
-                      ? Colors.blue.shade100
-                      : _isApiReachable
-                      ? Colors.green.shade100
-                      : Colors.orange.shade100,
-                  border: Border.all(
-                    color: _isCheckingApi
-                        ? Colors.blue
-                        : _isApiReachable
-                        ? Colors.green
-                        : Colors.orange,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_isCheckingApi)
-                      SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.blue,
-                          ),
-                        ),
-                      )
-                    else
-                      Icon(
-                        _isApiReachable ? Icons.check_circle : Icons.warning,
-                        color: _isApiReachable ? Colors.green : Colors.orange,
-                        size: 20,
-                      ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _isCheckingApi
-                          ? 'Checking API endpoint...'
-                          : _isApiReachable
-                          ? 'API endpoint reachable'
-                          : 'API endpoint not reachable',
-                      style: TextStyle(
-                        color: _isCheckingApi
-                            ? Colors.blue
-                            : _isApiReachable
-                            ? Colors.green
-                            : Colors.orange,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            const SizedBox(height: 24),
+
+            // Service Information Section
+            _buildServiceInfoSection(),
+
+            const SizedBox(height: 24),
+
+            // Service Control Section
+            _buildServiceControlSection(),
+
+            const SizedBox(height: 24),
+
+            // Counter Actions Section
+            _buildCounterActionsSection(),
           ],
         ),
       ),
