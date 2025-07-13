@@ -3,58 +3,60 @@ package com.github.dilrandi.sms_to_api
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.provider.Telephony
+import android.telephony.SmsMessage
 import android.util.Log
+import android.widget.Toast
 
 class SmsReceiver : BroadcastReceiver() {
-    companion object {
-        private const val TAG = "SmsReceiver"
-    }
 
-    override fun onReceive(context: Context, intent: Intent) {
-        Log.d(TAG, "onReceive called with action: ${intent.action}")
-        
-        try {
-            if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
-                Log.d(TAG, "SMS_RECEIVED_ACTION detected - SMS received!")
-                
-                // Log SMS details for debugging
-                try {
-                    val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
-                    if (messages != null && messages.isNotEmpty()) {
-                        Log.d(TAG, "Found ${messages.size} SMS messages")
-                        for (message in messages) {
-                            Log.d(TAG, "SMS from: ${message.originatingAddress}, body: ${message.messageBody}")
-                        }
-                    } else {
-                        Log.w(TAG, "No SMS messages found in intent")
+    private val TAG = "SmsReceiver"
+
+    override fun onReceive(context: Context?, intent: Intent?) {
+        // Ensure the context and intent are not null and the action matches SMS_RECEIVED_ACTION
+        if (context == null ||
+                        intent == null ||
+                        intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION
+        ) {
+            Log.w(TAG, "Invalid intent or action received: ${intent?.action}")
+            return
+        }
+
+        // Use Telephony.Sms.Intents.getMessagesFromIntent() for modern API usage
+        val messages: Array<SmsMessage>? = Telephony.Sms.Intents.getMessagesFromIntent(intent)
+
+        if (messages.isNullOrEmpty()) {
+            Log.w(TAG, "No SMS messages found in the intent.")
+            return
+        }
+
+        // Process each SMS message
+        for (smsMessage in messages) {
+            val sender = smsMessage.displayOriginatingAddress
+            val messageBody = smsMessage.messageBody
+
+            val fullMessage = "SMS from: $sender\nMessage: $messageBody"
+            Log.d(TAG, fullMessage)
+
+            val serviceIntent =
+                    Intent(context, CounterService::class.java).apply {
+                        action = CounterService.ACTION_INCREMENT_COUNTER_FROM_SMS
+                        putExtra("sms_sender", sender)
+                        putExtra("sms_body", messageBody)
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error parsing SMS from intent: ${e.message}")
-                }
-                
-                // Start the SMS processing service
-                Log.d(TAG, "Starting SmsForwardingService...")
-                val serviceIntent = Intent(context, SmsForwardingService::class.java)
-                serviceIntent.action = SmsForwardingService.ACTION_PROCESS_SMS
-                try {
+
+            // Start the service appropriately based on Android version
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     context.startForegroundService(serviceIntent)
-                    Log.d(TAG, "SmsForwardingService started successfully")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to start SmsForwardingService: ${e.message}")
-                    // Try starting without foreground service as fallback
-                    try {
-                        context.startService(serviceIntent)
-                        Log.d(TAG, "SmsForwardingService started as regular service")
-                    } catch (e2: Exception) {
-                        Log.e(TAG, "Failed to start SmsForwardingService as regular service: ${e2.message}")
-                    }
+                } else {
+                    context.startService(serviceIntent)
                 }
-            } else {
-                Log.d(TAG, "Received intent with different action: ${intent.action}")
+                Log.d(TAG, "Sent intent to CounterService to increment counter.")
+            } catch (e: IllegalStateException) {
+                Log.e(TAG, "Failed to start CounterService: ${e.message}")
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error in SMS receiver: ${e.message}", e)
         }
     }
 }

@@ -39,10 +39,10 @@ android {
     }
 }
 
-flutter {
-    source = "../.."
+dependencies {
+    implementation("androidx.core:core-ktx:1.16.0")
 }
 
-dependencies {
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+flutter {
+    source = "../.."
 }
