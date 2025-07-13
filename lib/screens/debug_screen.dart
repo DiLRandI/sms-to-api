@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_sms_inbox/flutter_sms_inbox.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import '../services/api_service.dart';
 import '../services/contact_filter_service.dart';
+import '../services/logging_service.dart';
 
 class DebugScreen extends StatefulWidget {
   const DebugScreen({super.key});
@@ -58,6 +61,18 @@ class _DebugScreenState extends State<DebugScreen> {
                 ElevatedButton(
                   onPressed: _clearResults,
                   child: const Text('Clear Results'),
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  onPressed: _checkLogData,
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+                  child: const Text('5. Check Log Data Format'),
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  onPressed: _simulateCrashScenario,
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text('6. Simulate SMS Processing'),
                 ),
               ],
             ),
@@ -207,5 +222,106 @@ class _DebugScreenState extends State<DebugScreen> {
     setState(() {
       _debugResults.clear();
     });
+  }
+
+  Future<void> _checkLogData() async {
+    _addResult('=== CHECKING LOG DATA FORMAT ===');
+
+    try {
+      // Check SharedPreferences directly
+      final prefs = await SharedPreferences.getInstance();
+
+      // Check Dart format logs
+      final dartLogs = prefs.getStringList('app_logs');
+      _addResult(
+        'Dart format logs (StringList): ${dartLogs != null ? dartLogs.length : 'null'}',
+      );
+
+      // Check Android format logs
+      final androidLogs = prefs.getString('flutter.app_logs');
+      _addResult(
+        'Android format logs (String): ${androidLogs != null ? 'exists (${androidLogs.length} chars)' : 'null'}',
+      );
+
+      if (androidLogs != null &&
+          androidLogs.isNotEmpty &&
+          androidLogs != '[]') {
+        try {
+          final parsed = jsonDecode(androidLogs);
+          if (parsed is List) {
+            _addResult(
+              'Android logs parsed successfully: ${parsed.length} entries',
+            );
+          } else {
+            _addResult('Android logs format unexpected: ${parsed.runtimeType}');
+          }
+        } catch (e) {
+          _addResult('Android logs parse error: $e');
+        }
+      }
+
+      // Test log service
+      _addResult('Testing LoggingService...');
+      final logs = await LoggingService.getAllLogs();
+      _addResult('LoggingService returned ${logs.length} logs');
+
+      // Add a test log
+      await LoggingService.info(
+        'Debug test log',
+        'Testing log system from debug screen',
+      );
+      _addResult('Test log added successfully');
+    } catch (e) {
+      _addResult('Error checking log data: $e');
+    }
+  }
+
+  Future<void> _simulateCrashScenario() async {
+    _addResult('=== SIMULATING SMS PROCESSING SCENARIO ===');
+
+    try {
+      _addResult('Step 1: Testing direct Dart SMS reading...');
+
+      // Try to read SMS directly like the persistent service does
+      final SmsQuery query = SmsQuery();
+      final messages = await query.querySms(
+        kinds: [SmsQueryKind.inbox],
+        count: 1,
+      );
+
+      if (messages.isNotEmpty) {
+        final message = messages.first;
+        _addResult('Found latest SMS from: ${message.address}');
+
+        _addResult('Step 2: Testing contact filtering...');
+        final shouldForward = await ContactFilterService.shouldForwardMessage(
+          message.address ?? '',
+        );
+        _addResult('Contact filter result: $shouldForward');
+
+        if (shouldForward) {
+          _addResult('Step 3: Testing API forwarding...');
+          final apiService = ApiService();
+          final success = await apiService.forwardSms(
+            sender: message.address ?? 'Unknown',
+            message: 'DEBUG: ${message.body ?? 'No body'}',
+            timestamp: DateTime.now(),
+          );
+          _addResult('API forward result: $success');
+        }
+
+        _addResult('Step 4: Testing Android service integration...');
+        const platform = MethodChannel('sms_forwarding_service');
+        await platform.invokeMethod('testSmsProcessing');
+        _addResult('Android service test completed');
+      } else {
+        _addResult('No SMS messages found to test with');
+      }
+
+      _addResult('=== SIMULATION COMPLETED ===');
+    } catch (e) {
+      _addResult('ERROR in simulation: $e');
+      _addResult('Stack trace: ${e.toString()}');
+    }
   }
 }

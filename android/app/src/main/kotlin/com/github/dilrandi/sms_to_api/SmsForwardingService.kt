@@ -40,30 +40,43 @@ class SmsForwardingService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "onStartCommand called with action: ${intent?.action}")
         
-        when (intent?.action) {
-            ACTION_START_SERVICE -> {
-                Log.d(TAG, "Starting foreground service...")
-                startForegroundService()
-                logToSharedPrefs("info", "SMS Forwarding Service started", "Background service is now active")
-            }
-            ACTION_STOP_SERVICE -> {
-                Log.d(TAG, "Stopping foreground service...")
-                stopForegroundService()
-                logToSharedPrefs("info", "SMS Forwarding Service stopped", "Background service is now inactive")
-            }
-            ACTION_PROCESS_SMS -> {
-                Log.d(TAG, "Processing SMS action received")
-                // Ensure service is running in foreground for SMS processing
-                if (!isServiceRunning()) {
-                    Log.d(TAG, "Service not in foreground, starting foreground mode...")
+        try {
+            when (intent?.action) {
+                ACTION_START_SERVICE -> {
+                    Log.d(TAG, "Starting foreground service...")
                     startForegroundService()
+                    logToSharedPrefs("info", "SMS Forwarding Service started", "Background service is now active")
                 }
-                processPendingSms()
+                ACTION_STOP_SERVICE -> {
+                    Log.d(TAG, "Stopping foreground service...")
+                    stopForegroundService()
+                    logToSharedPrefs("info", "SMS Forwarding Service stopped", "Background service is now inactive")
+                }
+                ACTION_PROCESS_SMS -> {
+                    Log.d(TAG, "Processing SMS action received")
+                    // Ensure service is running in foreground for SMS processing
+                    if (!isServiceRunning()) {
+                        Log.d(TAG, "Service not in foreground, starting foreground mode...")
+                        startForegroundService()
+                    }
+                    processPendingSms()
+                }
+                else -> {
+                    Log.w(TAG, "Unknown action received: ${intent?.action}")
+                }
             }
-            else -> {
-                Log.w(TAG, "Unknown action received: ${intent?.action}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in onStartCommand: ${e.message}", e)
+            logToSharedPrefs("error", "Service command failed", e.message ?: "Unknown error")
+            
+            // Try to start foreground service anyway to prevent crash
+            try {
+                startForegroundService()
+            } catch (e2: Exception) {
+                Log.e(TAG, "Failed to start foreground service: ${e2.message}", e2)
             }
         }
+        
         return START_STICKY // Restart service if killed by system
     }
 
@@ -97,20 +110,37 @@ class SmsForwardingService : Service() {
             try {
                 Log.d(TAG, "Processing pending SMS messages in coroutine")
                 
+                // Ensure we have SMS read permission
+                if (checkSelfPermission(android.Manifest.permission.READ_SMS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    Log.w(TAG, "SMS read permission not granted, cannot process SMS")
+                    logToSharedPrefs("warning", "SMS permission not granted", "Cannot process SMS messages")
+                    return@launch
+                }
+                
                 // Get the latest SMS messages
                 val smsMessages = getLatestSmsMessages()
                 Log.d(TAG, "Found ${smsMessages.size} SMS messages to process")
                 
+                if (smsMessages.isEmpty()) {
+                    Log.d(TAG, "No new SMS messages to process")
+                    return@launch
+                }
+                
                 for (sms in smsMessages) {
-                    Log.d(TAG, "Processing SMS from ${sms.address}: ${sms.body.take(50)}...")
-                    if (shouldForwardMessage(sms)) {
-                        Log.d(TAG, "SMS passed filtering, forwarding to API...")
-                        forwardSmsToApi(sms)
-                        updateMessageCount()
-                        Log.d(TAG, "SMS forwarded successfully")
-                    } else {
-                        Log.d(TAG, "SMS filtered out by contact filtering")
-                        logToSharedPrefs("info", "SMS filtered out", "From: ${sms.address}")
+                    try {
+                        Log.d(TAG, "Processing SMS from ${sms.address}: ${sms.body.take(50)}...")
+                        if (shouldForwardMessage(sms)) {
+                            Log.d(TAG, "SMS passed filtering, forwarding to API...")
+                            forwardSmsToApi(sms)
+                            updateMessageCount()
+                            Log.d(TAG, "SMS forwarded successfully")
+                        } else {
+                            Log.d(TAG, "SMS filtered out by contact filtering")
+                            logToSharedPrefs("info", "SMS filtered out", "From: ${sms.address}")
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error processing individual SMS: ${e.message}", e)
+                        logToSharedPrefs("error", "Individual SMS processing failed", "From: ${sms.address}, Error: ${e.message}")
                     }
                 }
                 
