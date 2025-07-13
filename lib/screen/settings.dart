@@ -114,10 +114,13 @@ class _SettingsFormState extends State<_SettingsForm> {
               onPressed: () async {
                 if (_formKey.currentState!.validate()) {
                   try {
+                    // Load existing settings to preserve phone numbers
+                    final existingSettings = await _storage.load();
                     var saved = await _storage.save(
                       Settings(
                         url: _urlController.text,
                         apiKey: _apiKeyController.text,
+                        phoneNumbers: existingSettings?.phoneNumbers ?? [],
                       ),
                     );
                     ScaffoldMessenger.of(context).showSnackBar(

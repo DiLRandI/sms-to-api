@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:sms_to_api/screen/phone_numbers.dart';
 import 'package:sms_to_api/screen/settings.dart';
 import 'package:sms_to_api/service/api_service.dart';
 import 'package:sms_to_api/storage/settings/storage.dart';
@@ -561,6 +562,23 @@ class _MyHomePageState extends State<MyHomePage> {
             style: IconButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
               foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.phone),
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PhoneNumbersScreen(),
+                ),
+              );
+            },
+            tooltip: 'Phone Numbers',
+            style: IconButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.secondary,
+              foregroundColor: Theme.of(context).colorScheme.onSecondary,
             ),
           ),
           const SizedBox(width: 8),

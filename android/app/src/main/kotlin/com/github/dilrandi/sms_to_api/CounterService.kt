@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import org.json.JSONArray
 import org.json.JSONObject
 
 class CounterService : Service() {
@@ -161,9 +162,29 @@ class CounterService : Service() {
             return
         }
 
-        val (url, apiKey) = getStoredSettings()
-        if (url == null || apiKey == null) {
+        val (url, apiKey, phoneNumbers) = getStoredSettings()
+        if (url.isNullOrEmpty() || apiKey.isNullOrEmpty()) {
             Log.w(TAG, "API URL or API Key not configured, skipping API call")
+            return
+        }
+
+        // Check if phone numbers are configured and if sender matches any of them
+        if (phoneNumbers.isNotEmpty()) {
+            val senderMatches = phoneNumbers.any { configuredNumber ->
+                // Check for exact match or if the sender contains the configured number
+                smsSender == configuredNumber || 
+                smsSender.contains(configuredNumber) ||
+                configuredNumber.contains(smsSender)
+            }
+            
+            if (!senderMatches) {
+                Log.d(TAG, "SMS sender '$smsSender' does not match any configured phone numbers: $phoneNumbers. Skipping API call")
+                return
+            }
+            
+            Log.d(TAG, "SMS sender '$smsSender' matches configured phone numbers. Proceeding with API call")
+        } else {
+            Log.d(TAG, "No phone numbers configured, sending all SMS to API")
             return
         }
 
@@ -199,7 +220,7 @@ class CounterService : Service() {
                 .start()
     }
 
-    private fun getStoredSettings(): Pair<String?, String?> {
+    private fun getStoredSettings(): Triple<String?, String?, List<String>> {
         val sharedPrefs: SharedPreferences =
                 getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         val settingsJson = sharedPrefs.getString("flutter.settings_data", null)
@@ -207,16 +228,26 @@ class CounterService : Service() {
         return if (settingsJson != null) {
             try {
                 val jsonObject = JSONObject(settingsJson)
-                val url = jsonObject.optString("url", null)
-                val apiKey = jsonObject.optString("apiKey", null)
-                Pair(url, apiKey)
+                val url = if (jsonObject.optString("url", "").isNotEmpty()) jsonObject.optString("url", "") else null
+                val apiKey = if (jsonObject.optString("apiKey", "").isNotEmpty()) jsonObject.optString("apiKey", "") else null
+                val phoneNumbers = mutableListOf<String>()
+                
+                // Parse phone numbers array if it exists
+                if (jsonObject.has("phoneNumbers")) {
+                    val phoneNumbersArray = jsonObject.getJSONArray("phoneNumbers")
+                    for (i in 0 until phoneNumbersArray.length()) {
+                        phoneNumbers.add(phoneNumbersArray.getString(i))
+                    }
+                }
+                
+                Triple(url, apiKey, phoneNumbers)
             } catch (e: Exception) {
                 Log.e(TAG, "Error parsing settings JSON: ${e.message}")
-                Pair(null, null)
+                Triple(null, null, emptyList())
             }
         } else {
             Log.d(TAG, "No settings found in SharedPreferences")
-            Pair(null, null)
+            Triple(null, null, emptyList())
         }
     }
 
