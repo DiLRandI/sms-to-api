@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:sms_to_api/storage/settings/storage.dart';
-import 'package:sms_to_api/storage/settings/type.dart';
 
 class SMSMessage {
   final String message;

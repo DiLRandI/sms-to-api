@@ -2,6 +2,8 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.RECEIVE_SMS"/>
     <uses-permission android:name="android.permission.READ_SMS"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
     <application
         android:label="sms_to_api"
@@ -35,10 +37,11 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
-        <service
+      <service
             android:name=".CounterService"
             android:enabled="true"
-            android:exported="false" /> <!-- exported="false" means only your app can bind to it -->
+            android:exported="false"
+            android:foregroundServiceType="dataSync" /> <!-- Specify foreground service type (API 29+) -->
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

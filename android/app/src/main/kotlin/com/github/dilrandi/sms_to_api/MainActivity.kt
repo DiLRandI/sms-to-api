@@ -1,98 +1,110 @@
 package com.github.dilrandi.sms_to_api
 
-import io.flutter.embedding.android.FlutterActivity
-import io.flutter.plugin.common.MethodChannel
-import io.flutter.embedding.engine.FlutterEngine
-import android.content.ServiceConnection
-import android.content.ComponentName
-import android.os.IBinder
-import android.util.Log
+import android.Manifest
 import android.content.Intent
-import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import android.util.Log
+import androidx.core.app.ActivityCompat
+import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : FlutterActivity(){
- // Define the same channel name as in Flutter
+class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.github.dilrandi.sms_to_api/counter"
-
-    private var counterService: CounterService? = null
-    private var isBound = false
     private lateinit var channel: MethodChannel
 
-    // Defines callbacks for service binding, unbinding, and re-binding.
-    private val connection = object : ServiceConnection {
-        override fun onServiceConnected(className: ComponentName, service: IBinder) {
-            // We've bound to LocalService, cast the IBinder and get LocalService instance
-            val binder = service as CounterService.CounterBinder
-            counterService = binder.getService()
-            isBound = true
-            Log.d("MainActivity", "Service Bound: isBound=$isBound")
-            
-            // Inform Flutter about the status change
-            channel.invokeMethod("onServiceStatusChanged", "Bound")
-        }
-
-        override fun onServiceDisconnected(arg0: ComponentName) {
-            isBound = false
-            counterService = null
-            Log.d("MainActivity", "Service Disconnected: isBound=$isBound")
-            // Inform Flutter about the status change
-            channel.invokeMethod("onServiceStatusChanged", "Disconnected")
-        }
-    }
+    private val NOTIFICATION_PERMISSION_REQUEST_CODE = 102
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
-                "bindCounterService" -> {
-                    if (!isBound) {
-                        val intent = Intent(this, CounterService::class.java)
-                        // BIND_AUTO_CREATE creates the service if it's not already running
-                        bindService(intent, connection, Context.BIND_AUTO_CREATE)
-                        result.success("Binding...")
-                    } else {
-                        result.success("Already Bound")
+                "startCounterService" -> {
+                    // Request notification permission before starting foreground service (Android 13+)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                            ActivityCompat.requestPermissions(
+                                this,
+                                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                                NOTIFICATION_PERMISSION_REQUEST_CODE
+                            )
+                            // We return a pending state, and will start service in onRequestPermissionsResult
+                            result.success("Permission requested. Starting service after permission.")
+                            return@setMethodCallHandler
+                        }
                     }
+                    startCounterServiceInternal(result)                                                                                                                                                                                                                                                 
                 }
-                "unbindCounterService" -> {
-                    if (isBound) {
-                        unbindService(connection)
-                        isBound = false
-                        counterService = null
-                        result.success("Unbound")
-                    } else {
-                        result.success("Not Bound")
-                    }
+                "stopCounterService" -> {
+                    val intent = Intent(this, CounterService::class.java)
+                    stopService(intent)
+                    channel.invokeMethod("onServiceStatusChanged", "Stopped")
+                    result.success("Service stopped.")
                 }
                 "incrementCounter" -> {
-                    if (isBound && counterService != null) {
-                        val newCounterValue = counterService!!.incrementCounter()
-                        result.success(newCounterValue)
-                    } else {
-                        result.error("UNBOUND_SERVICE", "Service is not bound or null", null)
-                    }
+                    // To call service methods, we need to ensure the service is running
+                    // and then call its methods. For a started service, we can't directly
+                    // get a binder like before. We'll rely on the service being started
+                    // and then communicate with it (e.g., via static methods or another channel).
+                    // For this simple example, we'll just call the method on a new instance
+                    // of the service, assuming it's running. In a real app, you might
+                    // use a bound service for method calls, or broadcast intents to a started service.
+                    // For simplicity, we'll instantiate the service and call its method.
+                    // THIS IS NOT IDEAL FOR PRODUCTION. For robust communication, consider
+                    // a more complex IPC mechanism or a bound service that is also started.
+                    val service = CounterService() // This creates a new instance, not the running one
+                    val newCounterValue = service.incrementCounter() // This operates on a new instance's counter
+                    result.success(newCounterValue)
                 }
                 "getCounter" -> {
-                    if (isBound && counterService != null) {
-                        val currentCounterValue = counterService!!.getCounter()
-                        result.success(currentCounterValue)
-                    } else {
-                        result.error("UNBOUND_SERVICE", "Service is not bound or null", null)
-                    }
+                    val service = CounterService() // Same as above, new instance
+                    val currentCounterValue = service.getCounter()
+                    result.success(currentCounterValue)
                 }
                 else -> result.notImplemented()
             }
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        // Ensure the service is unbound when the activity is destroyed to prevent leaks
-        if (isBound) {
-            unbindService(connection)
-            isBound = false
+    private fun startCounterServiceInternal(result: MethodChannel.Result) {
+        val intent = Intent(this, CounterService::class.java)
+        // For Android O and above, you must use startForegroundService()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {                                                                                                                                                   
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
+        channel.invokeMethod("onServiceStatusChanged", "Running")
+        result.success("Service started.")
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Log.d("MainActivity", "POST_NOTIFICATIONS permission granted.")
+                // If permission granted, try starting the service again
+                startCounterServiceInternal(object : MethodChannel.Result {
+                    override fun success(result: Any?) {
+                        channel.invokeMethod("onServiceStatusChanged", result as String)
+                    }
+                    override fun error(errorCode: String, errorMessage: String?, errorDetails: Any?) {
+                        channel.invokeMethod("onServiceStatusChanged", "Error: $errorMessage")
+                    }
+                    override fun notImplemented() {
+                        channel.invokeMethod("onServiceStatusChanged", "Not Implemented")
+                    }
+                })
+            } else {
+                Log.w("MainActivity", "POST_NOTIFICATIONS permission denied.")
+                channel.invokeMethod("onServiceStatusChanged", "Permission Denied, Service Not Started")
+            }
         }
     }
 }
-

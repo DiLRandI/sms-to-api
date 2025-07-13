@@ -20,7 +20,6 @@ import 'package:flutter/services.dart';
 //     );
 //   }
 // }
-
 void main() {
   runApp(const MyApp());
 }
@@ -52,7 +51,7 @@ class _CounterScreenState extends State<CounterScreen> {
   );
 
   int _counter = 0;
-  String _serviceStatus = 'Not Bound';
+  String _serviceStatus = 'Not Running'; // Initial status
 
   @override
   void initState() {
@@ -67,35 +66,38 @@ class _CounterScreenState extends State<CounterScreen> {
     });
   }
 
-  // Method to bind to the native Android service
-  Future<void> _bindService() async {
+  // Method to start the native Android foreground service
+  Future<void> _startService() async {
     try {
-      final String result = await _channel.invokeMethod('bindCounterService');
+      final String result = await _channel.invokeMethod('startCounterService');
       setState(() {
         _serviceStatus = result;
       });
+      _showSnackBar("Service started: $result");
     } on PlatformException catch (e) {
       setState(() {
-        _serviceStatus = "Failed to bind: '${e.message}'";
+        _serviceStatus = "Failed to start: '${e.message}'";
       });
-      debugPrint("Failed to bind service: ${e.message}");
-      _showSnackBar("Failed to bind: ${e.message}");
+      debugPrint("Failed to start service: ${e.message}");
+      _showSnackBar("Error starting service: ${e.message}");
     }
   }
 
-  // Method to unbind from the native Android service
-  Future<void> _unbindService() async {
+  // Method to stop the native Android foreground service
+  Future<void> _stopService() async {
     try {
-      final String result = await _channel.invokeMethod('unbindCounterService');
+      final String result = await _channel.invokeMethod('stopCounterService');
       setState(() {
         _serviceStatus = result;
+        _counter = 0; // Reset counter when service stops
       });
+      _showSnackBar("Service stopped: $result");
     } on PlatformException catch (e) {
       setState(() {
-        _serviceStatus = "Failed to unbind: '${e.message}'";
+        _serviceStatus = "Failed to stop: '${e.message}'";
       });
-      debugPrint("Failed to unbind service: ${e.message}");
-      _showSnackBar("Failed to unbind: ${e.message}");
+      debugPrint("Failed to stop service: ${e.message}");
+      _showSnackBar("Error stopping service: ${e.message}");
     }
   }
 
@@ -152,13 +154,13 @@ class _CounterScreenState extends State<CounterScreen> {
               ),
               const SizedBox(height: 40),
               ElevatedButton(
-                onPressed: _bindService,
-                child: const Text('Bind Service'),
+                onPressed: _startService,
+                child: const Text('Start Service'),
               ),
               const SizedBox(height: 10),
               ElevatedButton(
-                onPressed: _unbindService,
-                child: const Text('Unbind Service'),
+                onPressed: _stopService,
+                child: const Text('Stop Service'),
               ),
               const SizedBox(height: 10),
               ElevatedButton(
