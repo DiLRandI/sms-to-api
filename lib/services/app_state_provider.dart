@@ -131,7 +131,7 @@ class AppStateProvider extends ChangeNotifier {
         'SMS service stopping',
         'User initiated service stop',
       );
-      SmsService.stopSmsListener();
+      await SmsService.stopSmsListener();
       await LoggingService.info(
         'SMS service stopped',
         'Service is no longer monitoring SMS',

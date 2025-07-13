@@ -4,6 +4,14 @@
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.INTERNET" />
     
+    <!-- Background execution permissions -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    
+    <!-- SMS broadcast receiver permission -->
+    <uses-permission android:name="android.permission.BROADCAST_SMS" />
+    
     <application
         android:label="sms_to_api"
         android:name="${applicationName}"

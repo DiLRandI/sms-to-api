@@ -33,15 +33,12 @@ class ApiService {
     try {
       final config = await getApiConfig();
       final apiUrl = config['url'];
-      
+
       if (apiUrl == null || apiUrl.isEmpty) {
-        print('API URL not configured');
         return false;
       }
 
-      final headers = <String, String>{
-        'Content-Type': 'application/json',
-      };
+      final headers = <String, String>{'Content-Type': 'application/json'};
 
       // Add API key if configured
       final apiKey = config['key'];
@@ -53,10 +50,7 @@ class ApiService {
         'sender': sender,
         'message': message,
         'timestamp': timestamp.toIso8601String(),
-        'device_info': {
-          'platform': 'android',
-          'app': 'sms_to_api',
-        }
+        'device_info': {'platform': 'android', 'app': 'sms_to_api'},
       });
 
       final response = await http.post(
@@ -66,14 +60,11 @@ class ApiService {
       );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        print('SMS forwarded successfully: ${response.statusCode}');
         return true;
       } else {
-        print('Failed to forward SMS: ${response.statusCode} - ${response.body}');
         return false;
       }
     } catch (e) {
-      print('Error forwarding SMS: $e');
       return false;
     }
   }
@@ -83,14 +74,12 @@ class ApiService {
     try {
       final config = await getApiConfig();
       final apiUrl = config['url'];
-      
+
       if (apiUrl == null || apiUrl.isEmpty) {
         return false;
       }
 
-      final headers = <String, String>{
-        'Content-Type': 'application/json',
-      };
+      final headers = <String, String>{'Content-Type': 'application/json'};
 
       final apiKey = config['key'];
       if (apiKey != null && apiKey.isNotEmpty) {
@@ -112,7 +101,6 @@ class ApiService {
 
       return response.statusCode >= 200 && response.statusCode < 300;
     } catch (e) {
-      print('Error testing API connection: $e');
       return false;
     }
   }

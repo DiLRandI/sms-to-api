@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/app_state_provider.dart';
 import 'services/logging_service.dart';
+import 'services/sms_service.dart';
 import 'screens/home_screen.dart';
 
 void main() async {
@@ -12,6 +13,9 @@ void main() async {
     'Application started',
     'SMS to API app initialized',
   );
+
+  // Initialize SMS service with lifecycle awareness
+  await SmsService.initialize();
 
   runApp(const MyApp());
 }

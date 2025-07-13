@@ -72,7 +72,6 @@ class ContactFilterService {
       sendersList.sort(); // Sort alphabetically
       return sendersList;
     } catch (e) {
-      print('Error getting unique senders: $e');
       return [];
     }
   }
