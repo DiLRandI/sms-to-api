@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -16,11 +17,32 @@ class CounterService : Service() {
     private val TAG = "CounterService"
     private var counter: Int = 0 // The counter state
 
-    // For a started service, we don't need a Binder to expose methods directly
-    // in the same way as a bound service. We'll use MethodChannel for communication.
+    // Binder given to clients for local interaction
+    private val binder = CounterBinder()
+
+    /**
+     * Class used for the client Binder. Because we know this service always
+     * runs in the same process as its clients, we don't need to deal with IPC.
+     */
+    inner class CounterBinder : Binder() {
+        // Return this instance of CounterService so clients can call public methods
+        fun getService(): CounterService = this@CounterService
+    }
+
     override fun onBind(intent: Intent?): IBinder? {
-        Log.d(TAG, "CounterService: onBind() - Not providing a binding interface for started service.")
-        return null // Return null for a purely started service
+        Log.d(TAG, "CounterService: onBind()")
+        return binder // Return the binder for clients (MainActivity) to interact
+    }
+
+    override fun onUnbind(intent: Intent?): Boolean {
+        Log.d(TAG, "CounterService: onUnbind()")
+        // Returning true here means onRebind() will be called if clients bind again
+        return true
+    }
+
+    override fun onRebind(intent: Intent?) {
+        Log.d(TAG, "CounterService: onRebind()")
+        super.onRebind(intent)
     }
 
     override fun onCreate() {
@@ -30,7 +52,15 @@ class CounterService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "CounterService: onStartCommand()")
+        Log.d(TAG, "CounterService: onStartCommand() - Intent Action: ${intent?.action}")
+
+        // Check if the intent is from SMSReceiver to increment counter
+        if (intent?.action == ACTION_INCREMENT_COUNTER_FROM_SMS) {
+            val smsSender = intent.getStringExtra("sms_sender")
+            val smsBody = intent.getStringExtra("sms_body")
+            Log.d(TAG, "Received SMS increment command. Sender: $smsSender, Body: $smsBody")
+            incrementCounter() // Increment counter on SMS
+        }
 
         // Build the notification for the foreground service
         val notificationIntent = Intent(this, MainActivity::class.java)
@@ -44,17 +74,12 @@ class CounterService : Service() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Counter Service Running")
             .setContentText("Current Count: $counter") // You can update this later
-            // .setSmallIcon(R.drawable.ic_stat_name) // Use a proper icon for your app
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW) // Low priority to be less intrusive
             .build()
 
         // Start the service in the foreground
         startForeground(NOTIFICATION_ID, notification)
-
-        // Simulate some background work if needed, otherwise it just keeps running
-        // For actual long-running tasks, use a separate thread/coroutine here.
-        // For this example, the service simply runs and keeps the counter.
 
         // Return START_STICKY to ensure the service is restarted if killed by the system
         return START_STICKY
@@ -68,7 +93,7 @@ class CounterService : Service() {
 
     /**
      * Public method to increment the counter.
-     * This will be called via MethodChannel from Flutter.
+     * This will be called via MethodChannel from Flutter OR by an Intent from SmsReceiver.
      */
     fun incrementCounter(): Int {
         counter++
@@ -112,7 +137,6 @@ class CounterService : Service() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Counter Service Running")
             .setContentText("Current Count: $counter")
-            // .setSmallIcon(R.drawable.ic_stat_name) // Use a proper icon for your app
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
@@ -124,5 +148,6 @@ class CounterService : Service() {
     companion object {
         const val CHANNEL_ID = "CounterServiceChannel"
         const val NOTIFICATION_ID = 101 // Unique ID for your notification
+        const val ACTION_INCREMENT_COUNTER_FROM_SMS = "com.example.flutter_app.INCREMENT_COUNTER_FROM_SMS"
     }
 }

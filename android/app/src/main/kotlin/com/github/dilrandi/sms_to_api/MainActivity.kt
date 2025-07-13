@@ -10,11 +10,37 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
+
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.github.dilrandi.sms_to_api/counter"
+    private val CHANNEL = "com.example.flutter_counter_service/counter"
     private lateinit var channel: MethodChannel
 
+    private var counterService: CounterService? = null
+    private var isBound = false // To track if the activity is bound to the service
+
     private val NOTIFICATION_PERMISSION_REQUEST_CODE = 102
+    private val SMS_PERMISSION_REQUEST_CODE = 103 // New request code for SMS permissions
+
+    // Defines callbacks for service binding, unbinding, and re-binding.
+    private val connection = object : ServiceConnection {
+        override fun onServiceConnected(className: ComponentName, service: IBinder) {
+            // We've bound to CounterService, cast the IBinder and get CounterService instance
+            val binder = service as CounterService.CounterBinder
+            counterService = binder.getService()
+            isBound = true
+            Log.d("MainActivity", "Service Bound: isBound=$isBound")
+            // Inform Flutter about the status change
+            channel.invokeMethod("onServiceStatusChanged", "Running & Bound")
+        }
+
+        override fun onServiceDisconnected(arg0: ComponentName) {
+            isBound = false
+            counterService = null
+            Log.d("MainActivity", "Service Disconnected: isBound=$isBound")
+            // Inform Flutter about the status change
+            channel.invokeMethod("onServiceStatusChanged", "Running & Unbound")
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -31,37 +57,61 @@ class MainActivity : FlutterActivity() {
                                 NOTIFICATION_PERMISSION_REQUEST_CODE
                             )
                             // We return a pending state, and will start service in onRequestPermissionsResult
-                            result.success("Permission requested. Starting service after permission.")
+                            result.success("Permission requested. Service will start after permission.")
                             return@setMethodCallHandler
                         }
                     }
-                    startCounterServiceInternal(result)                                                                                                                                                                                                                                                 
+                    startCounterServiceInternal(result)
                 }
                 "stopCounterService" -> {
                     val intent = Intent(this, CounterService::class.java)
                     stopService(intent)
+                    // If the activity is bound, unbind it as the service is stopping
+                    if (isBound) {
+                        unbindService(connection)
+                        isBound = false
+                        counterService = null
+                    }
                     channel.invokeMethod("onServiceStatusChanged", "Stopped")
                     result.success("Service stopped.")
                 }
+                "bindCounterService" -> {
+                    if (!isBound) {
+                        val intent = Intent(this, CounterService::class.java)
+                        // BIND_AUTO_CREATE creates the service if it's not already running
+                        // and binds to it. If it's already running, it just binds.
+                        bindService(intent, connection, Context.BIND_AUTO_CREATE)
+                        result.success("Binding...")
+                    } else {
+                        result.success("Already Bound")
+                    }
+                }
+                "unbindCounterService" -> {
+                    if (isBound) {
+                        unbindService(connection)
+                        isBound = false
+                        counterService = null
+                        result.success("Unbound")
+                        channel.invokeMethod("onServiceStatusChanged", "Running & Unbound") // Service is still running in foreground
+                    } else {
+                        result.success("Not Bound")
+                    }
+                }
                 "incrementCounter" -> {
-                    // To call service methods, we need to ensure the service is running
-                    // and then call its methods. For a started service, we can't directly
-                    // get a binder like before. We'll rely on the service being started
-                    // and then communicate with it (e.g., via static methods or another channel).
-                    // For this simple example, we'll just call the method on a new instance
-                    // of the service, assuming it's running. In a real app, you might
-                    // use a bound service for method calls, or broadcast intents to a started service.
-                    // For simplicity, we'll instantiate the service and call its method.
-                    // THIS IS NOT IDEAL FOR PRODUCTION. For robust communication, consider
-                    // a more complex IPC mechanism or a bound service that is also started.
-                    val service = CounterService() // This creates a new instance, not the running one
-                    val newCounterValue = service.incrementCounter() // This operates on a new instance's counter
-                    result.success(newCounterValue)
+                    if (isBound && counterService != null) {
+                        val newCounterValue = counterService!!.incrementCounter()
+                        result.success(newCounterValue)
+                    } else {
+                        result.error("UNBOUND_SERVICE", "Service is not bound. Please bind first.", null)
+                    }
                 }
                 "getCounter" -> {
-                    val service = CounterService() // Same as above, new instance
-                    val currentCounterValue = service.getCounter()
-                    result.success(currentCounterValue)
+                    if (isBound && counterService != null) {
+                        val currentCounterValue = counterService!!.getCounter()
+                        result.success(currentCounterValue)
+                    } else {
+                        result.error("UNBOUND_SERVICE", "Service is not bound. Please bind first.", null)
+                    }
                 }
                 else -> result.notImplemented()
             }
@@ -71,7 +121,7 @@ class MainActivity : FlutterActivity() {
     private fun startCounterServiceInternal(result: MethodChannel.Result) {
         val intent = Intent(this, CounterService::class.java)
         // For Android O and above, you must use startForegroundService()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {                                                                                                                                                   
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent)
         } else {
             startService(intent)
@@ -80,17 +130,46 @@ class MainActivity : FlutterActivity() {
         result.success("Service started.")
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Request SMS permissions when the activity resumes
+        requestSmsPermissions()
+    }
+
+    private fun requestSmsPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val permissionsToRequest = mutableListOf<String>()
+            if (checkSelfPermission(Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.RECEIVE_SMS)
+            }
+            if (checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.READ_SMS)
+            }
+
+            if (permissionsToRequest.isNotEmpty()) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    permissionsToRequest.toTypedArray(),
+                    SMS_PERMISSION_REQUEST_CODE
+                )
+            } else {
+                Log.d("MainActivity", "SMS permissions already granted.")
+            }
+        }
+    }
+
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE) {
-            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Log.d("MainActivity", "POST_NOTIFICATIONS permission granted.")
-                // If permission granted, try starting the service again
-                startCounterServiceInternal(object : MethodChannel.Result {
+        when (requestCode) {
+            NOTIFICATION_PERMISSION_REQUEST_CODE -> {
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    Log.d("MainActivity", "POST_NOTIFICATIONS permission granted.")
+                    // If permission granted, try starting the service again
+                   startCounterServiceInternal(object : MethodChannel.Result {
                     override fun success(result: Any?) {
                         channel.invokeMethod("onServiceStatusChanged", result as String)
                     }
@@ -101,10 +180,28 @@ class MainActivity : FlutterActivity() {
                         channel.invokeMethod("onServiceStatusChanged", "Not Implemented")
                     }
                 })
-            } else {
-                Log.w("MainActivity", "POST_NOTIFICATIONS permission denied.")
-                channel.invokeMethod("onServiceStatusChanged", "Permission Denied, Service Not Started")
+                } else {
+                    Log.w("MainActivity", "POST_NOTIFICATIONS permission denied.")
+                    channel.invokeMethod("onServiceStatusChanged", "Permission Denied, Service Not Started")
+                }
             }
+            SMS_PERMISSION_REQUEST_CODE -> {
+                if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
+                    Log.d("MainActivity", "SMS permissions granted.")
+                } else {
+                    Log.w("MainActivity", "SMS permissions denied. SMS reception may not work.")
+                }
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Ensure the service is unbound when the activity is destroyed to prevent leaks
+        if (isBound) {
+            unbindService(connection)
+            isBound = false
+            counterService = null
         }
     }
 }
