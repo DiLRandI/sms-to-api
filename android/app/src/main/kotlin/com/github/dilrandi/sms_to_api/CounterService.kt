@@ -199,6 +199,10 @@ class CounterService : Service() {
                         connection.setRequestProperty("Content-Type", "application/json")
                         connection.setRequestProperty("Authorization", "Bearer $apiKey")
                         connection.doOutput = true
+                        // These numbers are set because the API will be a lambda, and it will not be provisioned,
+                        // therefore keep some time for cold starts
+                        connection.connectTimeout = 10000 // Set timeout for connection
+                        connection.readTimeout = 10000 // Set timeout for reading response
 
                         val jsonBody = JSONObject()
                         jsonBody.put("sender", smsSender)
