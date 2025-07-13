@@ -1,8 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'api_service.dart';
-import 'sms_service.dart';
+import 'android_sms_service.dart';
 import 'logging_service.dart';
+import 'dart:async';
 
 class AppStateProvider extends ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -27,6 +29,36 @@ class AppStateProvider extends ChangeNotifier {
   AppStateProvider() {
     _loadSettings();
     _checkPermissions();
+    _startMessageCountUpdater();
+  }
+
+  Timer? _messageCountTimer;
+
+  void _startMessageCountUpdater() {
+    _messageCountTimer?.cancel();
+    _messageCountTimer = Timer.periodic(const Duration(seconds: 5), (
+      timer,
+    ) async {
+      await _updateMessageCountFromService();
+    });
+  }
+
+  Future<void> _updateMessageCountFromService() async {
+    try {
+      final count = await AndroidSmsService.getMessageCount();
+      if (count != _messageCount) {
+        _messageCount = count;
+        notifyListeners();
+      }
+    } catch (e) {
+      // Silent fail - service might not be running
+    }
+  }
+
+  @override
+  void dispose() {
+    _messageCountTimer?.cancel();
+    super.dispose();
   }
 
   // Load settings from storage
@@ -47,17 +79,17 @@ class AppStateProvider extends ChangeNotifier {
 
   // Check permissions
   Future<void> _checkPermissions() async {
-    _hasPermissions = await SmsService.hasPermissions();
+    _hasPermissions = await Permission.sms.isGranted;
     notifyListeners();
   }
 
   // Request permissions
   Future<bool> requestPermissions() async {
     setLoading(true);
-    final granted = await SmsService.requestPermissions();
-    _hasPermissions = granted;
+    final smsPermission = await Permission.sms.request();
+    _hasPermissions = smsPermission.isGranted;
     setLoading(false);
-    return granted;
+    return _hasPermissions;
   }
 
   // Update API configuration
@@ -118,24 +150,41 @@ class AppStateProvider extends ChangeNotifier {
 
     if (_isServiceEnabled) {
       await LoggingService.info(
-        'SMS service starting',
+        'Android SMS service starting',
         'User initiated service start',
       );
-      await SmsService.initializeSmsListener();
-      await LoggingService.success(
-        'SMS service started',
-        'Service is now monitoring for incoming SMS',
-      );
+      final success = await AndroidSmsService.startService();
+      if (success) {
+        await LoggingService.success(
+          'Android SMS service started',
+          'Background service is now monitoring for incoming SMS',
+        );
+        // Request battery optimization exemption for better reliability
+        await AndroidSmsService.requestBatteryOptimizationExemption();
+      } else {
+        _isServiceEnabled = false;
+        await LoggingService.error(
+          'Failed to start Android SMS service',
+          'Service initialization failed',
+        );
+      }
     } else {
       await LoggingService.info(
-        'SMS service stopping',
+        'Android SMS service stopping',
         'User initiated service stop',
       );
-      await SmsService.stopSmsListener();
-      await LoggingService.info(
-        'SMS service stopped',
-        'Service is no longer monitoring SMS',
-      );
+      final success = await AndroidSmsService.stopService();
+      if (success) {
+        await LoggingService.info(
+          'Android SMS service stopped',
+          'Background service is no longer monitoring SMS',
+        );
+      } else {
+        await LoggingService.warning(
+          'Android SMS service stop may have failed',
+          'Service might still be running',
+        );
+      }
     }
 
     final prefs = await SharedPreferences.getInstance();
@@ -155,9 +204,8 @@ class AppStateProvider extends ChangeNotifier {
 
   // Reset message count
   void resetMessageCount() async {
+    await AndroidSmsService.resetMessageCount();
     _messageCount = 0;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('message_count', _messageCount);
     notifyListeners();
   }
 

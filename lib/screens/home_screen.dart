@@ -58,8 +58,8 @@ class HomeScreen extends StatelessWidget {
                         const SizedBox(height: 8),
                         Text(
                           provider.isServiceEnabled
-                              ? 'SMS messages will be automatically forwarded to your API'
-                              : 'Enable the service to start forwarding SMS messages',
+                              ? 'Background SMS service is running independently'
+                              : 'Enable the service to start the background SMS forwarder',
                           style: Theme.of(context).textTheme.bodyMedium,
                           textAlign: TextAlign.center,
                         ),
@@ -300,7 +300,7 @@ class HomeScreen extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'This app runs in the background and forwards SMS to your configured API endpoint.',
+                            'This app uses an Android background service that runs independently. The service will continue forwarding SMS even when the app is closed.',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ),
