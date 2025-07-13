@@ -1,17 +1,18 @@
 package com.github.dilrandi.sms_to_api
 
-
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import org.json.JSONObject
 
 class CounterService : Service() {
 
@@ -22,8 +23,8 @@ class CounterService : Service() {
     private val binder = CounterBinder()
 
     /**
-     * Class used for the client Binder. Because we know this service always
-     * runs in the same process as its clients, we don't need to deal with IPC.
+     * Class used for the client Binder. Because we know this service always runs in the same
+     * process as its clients, we don't need to deal with IPC.
      */
     inner class CounterBinder : Binder() {
         // Return this instance of CounterService so clients can call public methods
@@ -59,25 +60,32 @@ class CounterService : Service() {
         if (intent?.action == ACTION_INCREMENT_COUNTER_FROM_SMS) {
             val smsSender = intent.getStringExtra("sms_sender")
             val smsBody = intent.getStringExtra("sms_body")
-            Log.d(TAG, "Received SMS increment command. Sender: $smsSender, Body: $smsBody")
-            incrementCounter() // Increment counter on SMS
+
+            sendToApi(smsSender, smsBody) // Send SMS data to API
+
+            incrementCounter()
         }
 
         // Build the notification for the foreground service
         val notificationIntent = Intent(this, MainActivity::class.java)
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            notificationIntent,
-            PendingIntent.FLAG_IMMUTABLE // Use FLAG_IMMUTABLE for security
-        )
+        val pendingIntent =
+                PendingIntent.getActivity(
+                        this,
+                        0,
+                        notificationIntent,
+                        PendingIntent.FLAG_IMMUTABLE // Use FLAG_IMMUTABLE for security
+                )
 
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Counter Service Running")
-            .setContentText("Current Count: $counter") // You can update this later
-            .setContentIntent(pendingIntent)
-            .setPriority(NotificationCompat.PRIORITY_LOW) // Low priority to be less intrusive
-            .build()
+        val notification =
+                NotificationCompat.Builder(this, CHANNEL_ID)
+                        .setContentTitle("Counter Service Running")
+                        .setContentText("Current Count: $counter") // You can update this later
+                        .setSmallIcon(R.drawable.ic_stat_name) // Use a proper icon for your app
+                        .setContentIntent(pendingIntent)
+                        .setPriority(
+                                NotificationCompat.PRIORITY_LOW
+                        ) // Low priority to be less intrusive
+                        .build()
 
         // Start the service in the foreground
         startForeground(NOTIFICATION_ID, notification)
@@ -93,8 +101,8 @@ class CounterService : Service() {
     }
 
     /**
-     * Public method to increment the counter.
-     * This will be called via MethodChannel from Flutter OR by an Intent from SmsReceiver.
+     * Public method to increment the counter. This will be called via MethodChannel from Flutter OR
+     * by an Intent from SmsReceiver.
      */
     fun incrementCounter(): Int {
         counter++
@@ -104,8 +112,8 @@ class CounterService : Service() {
     }
 
     /**
-     * Public method to get the current counter value.
-     * This will be called via MethodChannel from Flutter.
+     * Public method to get the current counter value. This will be called via MethodChannel from
+     * Flutter.
      */
     fun getCounter(): Int {
         Log.d(TAG, "Current counter value requested: $counter")
@@ -116,11 +124,13 @@ class CounterService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val serviceChannel = NotificationChannel(
-                CHANNEL_ID,
-                "Counter Service Channel",
-                NotificationManager.IMPORTANCE_LOW // Importance LOW for less intrusive notification
-            )
+            val serviceChannel =
+                    NotificationChannel(
+                            CHANNEL_ID,
+                            "Counter Service Channel",
+                            NotificationManager.IMPORTANCE_LOW // Importance LOW for less intrusive
+                            // notification
+                            )
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(serviceChannel)
         }
@@ -128,27 +138,92 @@ class CounterService : Service() {
 
     private fun updateNotification() {
         val notificationIntent = Intent(this, MainActivity::class.java)
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            notificationIntent,
-            PendingIntent.FLAG_IMMUTABLE
-        )
+        val pendingIntent =
+                PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE)
 
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Counter Service Running")
-            .setContentText("Current Count: $counter")
-            .setContentIntent(pendingIntent)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .build()
+        val notification =
+                NotificationCompat.Builder(this, CHANNEL_ID)
+                        .setContentTitle("Counter Service Running")
+                        .setContentText("Current Count: $counter")
+                        .setSmallIcon(R.drawable.ic_stat_name) // Use a proper icon for your app
+                        .setContentIntent(pendingIntent)
+                        .setPriority(NotificationCompat.PRIORITY_LOW)
+                        .build()
 
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notificationManager =
+                getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(NOTIFICATION_ID, notification)
+    }
+
+    private fun sendToApi(smsSender: String?, smsBody: String?) {
+        if (smsSender == null || smsBody == null) {
+            Log.w(TAG, "SMS sender or body is null, skipping API call")
+            return
+        }
+
+        val (url, apiKey) = getStoredSettings()
+        if (url == null || apiKey == null) {
+            Log.w(TAG, "API URL or API Key not configured, skipping API call")
+            return
+        }
+
+        Log.d(TAG, "Sending SMS to API: sender=$smsSender, body=$smsBody")
+
+        // Use Kotlin's built-in HttpURLConnection for a simple HTTP POST
+        Thread {
+                    try {
+                        val apiUrl = java.net.URL(url)
+                        val connection = apiUrl.openConnection() as java.net.HttpURLConnection
+                        connection.requestMethod = "POST"
+                        connection.setRequestProperty("Content-Type", "application/json")
+                        connection.setRequestProperty("Authorization", "Bearer $apiKey")
+                        connection.doOutput = true
+
+                        val jsonBody = JSONObject()
+                        jsonBody.put("sender", smsSender)
+                        jsonBody.put("body", smsBody)
+
+                        val outputStream = connection.outputStream
+                        outputStream.write(jsonBody.toString().toByteArray(Charsets.UTF_8))
+                        outputStream.flush()
+                        outputStream.close()
+
+                        val responseCode = connection.responseCode
+                        Log.d(TAG, "API Response Code: $responseCode")
+                        connection.inputStream.close()
+                        connection.disconnect()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error sending SMS to API: ${e.message}")
+                    }
+                }
+                .start()
+    }
+
+    private fun getStoredSettings(): Pair<String?, String?> {
+        val sharedPrefs: SharedPreferences =
+                getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        val settingsJson = sharedPrefs.getString("flutter.settings_data", null)
+
+        return if (settingsJson != null) {
+            try {
+                val jsonObject = JSONObject(settingsJson)
+                val url = jsonObject.optString("url", null)
+                val apiKey = jsonObject.optString("apiKey", null)
+                Pair(url, apiKey)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error parsing settings JSON: ${e.message}")
+                Pair(null, null)
+            }
+        } else {
+            Log.d(TAG, "No settings found in SharedPreferences")
+            Pair(null, null)
+        }
     }
 
     companion object {
         const val CHANNEL_ID = "CounterServiceChannel"
         const val NOTIFICATION_ID = 101 // Unique ID for your notification
-        const val ACTION_INCREMENT_COUNTER_FROM_SMS = "com.example.flutter_app.INCREMENT_COUNTER_FROM_SMS"
+        const val ACTION_INCREMENT_COUNTER_FROM_SMS =
+                "com.example.flutter_app.INCREMENT_COUNTER_FROM_SMS"
     }
 }
