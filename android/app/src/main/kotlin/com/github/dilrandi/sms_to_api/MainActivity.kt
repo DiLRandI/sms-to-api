@@ -1,15 +1,19 @@
 package com.github.dilrandi.sms_to_api
 
-import android.Manifest
+
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
+import android.content.ServiceConnection
 import android.os.Build
+import android.os.IBinder
 import android.util.Log
-import androidx.core.app.ActivityCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
-
+import androidx.core.app.ActivityCompat
+import android.content.pm.PackageManager
+import android.Manifest
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.flutter_counter_service/counter"

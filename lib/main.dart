@@ -20,6 +20,7 @@ import 'package:flutter/services.dart';
 //     );
 //   }
 // }
+
 void main() {
   runApp(const MyApp());
 }
@@ -47,7 +48,7 @@ class CounterScreen extends StatefulWidget {
 class _CounterScreenState extends State<CounterScreen> {
   // Define the MethodChannel with a unique name
   static const MethodChannel _channel = MethodChannel(
-    'com.github.dilrandi.sms_to_api/counter',
+    'com.example.flutter_counter_service/counter',
   );
 
   int _counter = 0;
@@ -98,6 +99,40 @@ class _CounterScreenState extends State<CounterScreen> {
       });
       debugPrint("Failed to stop service: ${e.message}");
       _showSnackBar("Error stopping service: ${e.message}");
+    }
+  }
+
+  // Method to bind to the native Android service
+  Future<void> _bindService() async {
+    try {
+      final String result = await _channel.invokeMethod('bindCounterService');
+      setState(() {
+        _serviceStatus = result;
+      });
+      _showSnackBar("Service bind request: $result");
+    } on PlatformException catch (e) {
+      setState(() {
+        _serviceStatus = "Failed to bind: '${e.message}'";
+      });
+      debugPrint("Failed to bind service: ${e.message}");
+      _showSnackBar("Error binding service: ${e.message}");
+    }
+  }
+
+  // Method to unbind from the native Android service
+  Future<void> _unbindService() async {
+    try {
+      final String result = await _channel.invokeMethod('unbindCounterService');
+      setState(() {
+        _serviceStatus = result;
+      });
+      _showSnackBar("Service unbind request: $result");
+    } on PlatformException catch (e) {
+      setState(() {
+        _serviceStatus = "Failed to unbind: '${e.message}'";
+      });
+      debugPrint("Failed to unbind service: ${e.message}");
+      _showSnackBar("Error unbinding service: ${e.message}");
     }
   }
 
@@ -162,15 +197,25 @@ class _CounterScreenState extends State<CounterScreen> {
                 onPressed: _stopService,
                 child: const Text('Stop Service'),
               ),
+              const SizedBox(height: 20), // Added spacing
+              ElevatedButton(
+                onPressed: _bindService,
+                child: const Text('Bind Service'),
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: _unbindService,
+                child: const Text('Unbind Service'),
+              ),
               const SizedBox(height: 10),
               ElevatedButton(
                 onPressed: _incrementCounter,
-                child: const Text('Increment Counter'),
+                child: const Text('Increment Counter (App UI)'),
               ),
               const SizedBox(height: 10),
               ElevatedButton(
                 onPressed: _getCounter,
-                child: const Text('Get Counter'),
+                child: const Text('Get Counter (App UI)'),
               ),
             ],
           ),
