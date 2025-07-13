@@ -21,8 +21,8 @@ class _SettingsForm extends StatefulWidget {
 
 class _SettingsFormState extends State<_SettingsForm> {
   final _formKey = GlobalKey<FormState>();
-  String _url = '';
-  String _apiKey = '';
+  final _urlController = TextEditingController();
+  final _apiKeyController = TextEditingController();
 
   final Storage _storage = Storage();
 
@@ -32,12 +32,19 @@ class _SettingsFormState extends State<_SettingsForm> {
     _loadSettings();
   }
 
+  @override
+  void dispose() {
+    _urlController.dispose();
+    _apiKeyController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadSettings() async {
     final settings = await _storage.load();
     if (settings != null) {
       setState(() {
-        _url = settings.url;
-        _apiKey = settings.apiKey;
+        _urlController.text = settings.url;
+        _apiKeyController.text = settings.apiKey;
       });
     }
   }
@@ -61,7 +68,7 @@ class _SettingsFormState extends State<_SettingsForm> {
                 child: Column(
                   children: [
                     TextFormField(
-                      initialValue: _url,
+                      controller: _urlController,
                       decoration: InputDecoration(
                         labelText: 'API URL',
                         prefixIcon: const Icon(Icons.link),
@@ -77,13 +84,10 @@ class _SettingsFormState extends State<_SettingsForm> {
                         }
                         return null;
                       },
-                      onSaved: (value) {
-                        _url = value!;
-                      },
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
-                      initialValue: _apiKey,
+                      controller: _apiKeyController,
                       decoration: InputDecoration(
                         labelText: 'API Key',
                         prefixIcon: const Icon(Icons.key),
@@ -100,9 +104,6 @@ class _SettingsFormState extends State<_SettingsForm> {
                         }
                         return null;
                       },
-                      onSaved: (value) {
-                        _apiKey = value!;
-                      },
                     ),
                   ],
                 ),
@@ -112,13 +113,31 @@ class _SettingsFormState extends State<_SettingsForm> {
             ElevatedButton(
               onPressed: () async {
                 if (_formKey.currentState!.validate()) {
-                  _formKey.currentState!.save();
-                  await _storage.save(Settings(url: _url, apiKey: _apiKey));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Settings saved successfully!'),
-                    ),
-                  );
+                  try {
+                    var saved = await _storage.save(
+                      Settings(
+                        url: _urlController.text,
+                        apiKey: _apiKeyController.text,
+                      ),
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          saved
+                              ? 'Settings saved successfully!'
+                              : 'Failed to save settings.',
+                        ),
+                        backgroundColor: saved ? Colors.green : Colors.red,
+                      ),
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error saving settings: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
                 }
               },
               style: ElevatedButton.styleFrom(
