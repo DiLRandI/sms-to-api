@@ -57,4 +57,26 @@ class LogService {
     final prefs = await SharedPreferences.getInstance();
     return await prefs.remove(_androidLogsKey);
   }
+
+  // Debug method to check if there are Android-generated logs
+  Future<Map<String, dynamic>> getLogStatistics() async {
+    final allLogs = await getAllLogs();
+    final androidLogs = allLogs
+        .where(
+          (log) =>
+              log.tag.contains('SmsForwardingService') ||
+              log.tag.contains('LogManager'),
+        )
+        .toList();
+    final flutterLogs = allLogs
+        .where((log) => log.tag == 'LogService')
+        .toList();
+
+    return {
+      'total': allLogs.length,
+      'android_logs': androidLogs.length,
+      'flutter_logs': flutterLogs.length,
+      'log_sources': allLogs.map((log) => log.tag).toSet().toList(),
+    };
+  }
 }

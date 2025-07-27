@@ -232,6 +232,52 @@ class _LogsScreenState extends State<LogsScreen> {
     }
   }
 
+  Future<void> _showLogStatistics() async {
+    try {
+      final stats = await _logService.getLogStatistics();
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Log Statistics'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Total Logs: ${stats['total']}'),
+                  Text('Android Logs: ${stats['android_logs']}'),
+                  Text('Flutter Logs: ${stats['flutter_logs']}'),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Log Sources:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  ...((stats['log_sources'] as List<dynamic>).map(
+                    (source) => Text('• $source'),
+                  )),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Close'),
+                ),
+              ],
+            );
+          },
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error getting statistics: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredLogs = _getFilteredLogs();
@@ -243,6 +289,11 @@ class _LogsScreenState extends State<LogsScreen> {
         backgroundColor: Theme.of(context).colorScheme.surface,
         foregroundColor: Theme.of(context).colorScheme.onSurface,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.analytics),
+            onPressed: _showLogStatistics,
+            tooltip: 'Log Statistics',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadLogs,
