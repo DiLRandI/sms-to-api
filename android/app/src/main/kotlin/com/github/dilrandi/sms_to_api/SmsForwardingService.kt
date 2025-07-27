@@ -41,7 +41,7 @@ class SmsForwardingService : Service() {
     fun testApiCall() {
         logManager.logInfo(TAG, "Manual API test initiated")
         // Call the private sendToApi method for testing
-        sendToApi("TEST_SENDER", "This is a test message for API verification - triggered manually")
+        sendToApi("TEST_SENDER", "This is a test message for API verification - triggered manually", 1)
     }
 
     override fun onBind(intent: Intent?): IBinder? {
@@ -79,9 +79,14 @@ class SmsForwardingService : Service() {
         if (intent?.action == ACTION_FORWARD_SMS_TO_API) {
             val smsSender = intent?.getStringExtra("sms_sender")
             val smsBody = intent?.getStringExtra("sms_body")
+            val smsPartsCount = intent?.getIntExtra("sms_parts_count", 1) ?: 1
 
-            logManager.logInfo(TAG, "Received SMS from $smsSender with body: $smsBody")
-            sendToApi(smsSender, smsBody) // Send SMS data to API
+            if (smsPartsCount > 1) {
+                logManager.logInfo(TAG, "Received multi-part SMS ($smsPartsCount parts) from $smsSender with complete body: $smsBody")
+            } else {
+                logManager.logInfo(TAG, "Received SMS from $smsSender with body: $smsBody")
+            }
+            sendToApi(smsSender, smsBody, smsPartsCount) // Send SMS data to API
         }
 
         // Build the notification for the foreground service
@@ -134,7 +139,7 @@ class SmsForwardingService : Service() {
         }
     }
 
-    private fun sendToApi(smsSender: String?, smsBody: String?) {
+    private fun sendToApi(smsSender: String?, smsBody: String?, smsPartsCount: Int = 1) {
         if (smsSender == null || smsBody == null) {
             logManager.logWarning(TAG, "SMS sender or body is null, skipping API call")
             return
@@ -172,7 +177,8 @@ class SmsForwardingService : Service() {
             logManager.logInfo(TAG, "No phone numbers configured, sending all SMS to API")
         }
 
-        logManager.logInfo(TAG, "Sending SMS to API: sender=$smsSender, body=$smsBody")
+        val messageInfo = if (smsPartsCount > 1) "multi-part SMS ($smsPartsCount parts)" else "SMS"
+        logManager.logInfo(TAG, "Sending $messageInfo to API: sender=$smsSender, body=$smsBody")
 
         // Use Kotlin's built-in HttpURLConnection for a simple HTTP POST
         Thread {
@@ -195,6 +201,8 @@ class SmsForwardingService : Service() {
                         val jsonBody = JSONObject()
                         jsonBody.put("sender", smsSender)
                         jsonBody.put("body", smsBody)
+                        jsonBody.put("parts_count", smsPartsCount)
+                        jsonBody.put("is_multipart", smsPartsCount > 1)
 
                         val outputStream = connection.outputStream
                         outputStream.write(jsonBody.toString().toByteArray(Charsets.UTF_8))
