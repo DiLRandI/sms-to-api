@@ -203,7 +203,7 @@ class MainActivity : FlutterActivity() {
         if (isBound) {
             unbindService(connection)
             isBound = false
-            counterService = null
+            smsForwardingService = null
         }
     }
 }

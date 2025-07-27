@@ -58,10 +58,9 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   static const MethodChannel _channel = MethodChannel(
-    'com.github.dilrandi.sms_to_api_service/counter',
+    'com.github.dilrandi.sms_to_api_service/sms_forwarding',
   );
 
-  int _counter = 0;
   String _serviceStatus = 'Not Running'; // Initial status
 
   @override
@@ -81,7 +80,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> _startService() async {
     try {
-      final String result = await _channel.invokeMethod('startCounterService');
+      final String result = await _channel.invokeMethod(
+        'startSmsForwardingService',
+      );
       setState(() {
         _serviceStatus = result;
       });
@@ -98,10 +99,11 @@ class _MyHomePageState extends State<MyHomePage> {
   // Method to stop the native Android foreground service
   Future<void> _stopService() async {
     try {
-      final String result = await _channel.invokeMethod('stopCounterService');
+      final String result = await _channel.invokeMethod(
+        'stopSmsForwardingService',
+      );
       setState(() {
         _serviceStatus = result;
-        _counter = 0; // Reset counter when service stops
       });
       _showSnackBar("Service stopped: $result");
     } on PlatformException catch (e) {
@@ -116,7 +118,9 @@ class _MyHomePageState extends State<MyHomePage> {
   // Method to bind to the native Android service
   Future<void> _bindService() async {
     try {
-      final String result = await _channel.invokeMethod('bindCounterService');
+      final String result = await _channel.invokeMethod(
+        'bindSmsForwardingService',
+      );
       setState(() {
         _serviceStatus = result;
       });
@@ -133,7 +137,9 @@ class _MyHomePageState extends State<MyHomePage> {
   // Method to unbind from the native Android service
   Future<void> _unbindService() async {
     try {
-      final String result = await _channel.invokeMethod('unbindCounterService');
+      final String result = await _channel.invokeMethod(
+        'unbindSmsForwardingService',
+      );
       setState(() {
         _serviceStatus = result;
       });
@@ -144,32 +150,6 @@ class _MyHomePageState extends State<MyHomePage> {
       });
       debugPrint("Failed to unbind service: ${e.message}");
       _showSnackBar("Error unbinding service: ${e.message}");
-    }
-  }
-
-  // Method to increment the counter in the native Android service
-  Future<void> _incrementCounter() async {
-    try {
-      final int result = await _channel.invokeMethod('incrementCounter');
-      setState(() {
-        _counter = result;
-      });
-    } on PlatformException catch (e) {
-      debugPrint("Failed to increment counter: '${e.message}'");
-      _showSnackBar("Error: ${e.message}");
-    }
-  }
-
-  // Method to get the current counter value from the native Android service
-  Future<void> _getCounter() async {
-    try {
-      final int result = await _channel.invokeMethod('getCounter');
-      setState(() {
-        _counter = result;
-      });
-    } on PlatformException catch (e) {
-      debugPrint("Failed to get counter: '${e.message}'");
-      _showSnackBar("Error: ${e.message}");
     }
   }
 
@@ -377,23 +357,6 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(
-                  Icons.numbers,
-                  color: Theme.of(context).primaryColor,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Counter: $_counter',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
-                ),
-              ],
-            ),
           ],
         ),
       ),
@@ -482,59 +445,6 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                 ),
               ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCounterActionsSection() {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Counter Actions',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _incrementCounter,
-                icon: const Icon(Icons.add),
-                label: const Text('Increment Counter'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).primaryColor,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _getCounter,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Refresh Counter'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
             ),
           ],
         ),
@@ -635,11 +545,6 @@ class _MyHomePageState extends State<MyHomePage> {
 
             // Service Control Section
             _buildServiceControlSection(),
-
-            const SizedBox(height: 24),
-
-            // Counter Actions Section
-            _buildCounterActionsSection(),
           ],
         ),
       ),
