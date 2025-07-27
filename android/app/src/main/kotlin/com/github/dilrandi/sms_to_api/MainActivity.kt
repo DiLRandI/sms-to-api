@@ -103,6 +103,14 @@ class MainActivity : FlutterActivity() {
                         result.success("Not Bound")
                     }
                 }
+                "testApiCall" -> {
+                    if (smsForwardingService != null) {
+                        smsForwardingService!!.testApiCall()
+                        result.success("Test API call initiated")
+                    } else {
+                        result.error("SERVICE_NOT_AVAILABLE", "SMS Forwarding Service is not available. Please start and bind the service first.", null)
+                    }
+                }
                 else -> result.notImplemented()
             }
         }

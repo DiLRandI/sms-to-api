@@ -153,6 +153,17 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  // Method to test API call with sample data
+  Future<void> _testApiCall() async {
+    try {
+      final String result = await _channel.invokeMethod('testApiCall');
+      _showSnackBar("Test API call: $result");
+    } on PlatformException catch (e) {
+      debugPrint("Failed to test API: ${e.message}");
+      _showSnackBar("Error testing API: ${e.message}");
+    }
+  }
+
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(
       context,
@@ -445,6 +456,24 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+            // Test API button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _testApiCall,
+                icon: const Icon(Icons.send),
+                label: const Text('Test API'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
             ),
           ],
         ),

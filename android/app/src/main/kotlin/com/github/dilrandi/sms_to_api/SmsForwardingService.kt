@@ -10,17 +10,14 @@ import android.content.SharedPreferences
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
-import android.util.Log
 import androidx.core.app.NotificationCompat
-import io.flutter.plugin.common.MethodChannel
-import org.json.JSONArray
 import org.json.JSONObject
 
 data class AppSettings(
-    val url: String?,
-    val apiKey: String?,
-    val authHeaderName: String,
-    val phoneNumbers: List<String>
+        val url: String?,
+        val apiKey: String?,
+        val authHeaderName: String,
+        val phoneNumbers: List<String>
 )
 
 class SmsForwardingService : Service() {
@@ -38,6 +35,13 @@ class SmsForwardingService : Service() {
     inner class SmsForwardingBinder : Binder() {
         // Return this instance of SmsForwardingService so clients can call public methods
         fun getService(): SmsForwardingService = this@SmsForwardingService
+    }
+
+    // Public method to test API with sample data
+    fun testApiCall() {
+        logManager.logInfo(TAG, "Manual API test initiated")
+        // Call the private sendToApi method for testing
+        sendToApi("TEST_SENDER", "This is a test message for API verification - triggered manually")
     }
 
     override fun onBind(intent: Intent?): IBinder? {
@@ -66,7 +70,10 @@ class SmsForwardingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        logManager.logDebug(TAG, "SmsForwardingService: onStartCommand() - Intent Action: ${intent?.action}")
+        logManager.logDebug(
+                TAG,
+                "SmsForwardingService: onStartCommand() - Intent Action: ${intent?.action}"
+        )
 
         // Check if the intent is from SMSReceiver to forward SMS
         if (intent?.action == ACTION_FORWARD_SMS_TO_API) {
@@ -141,22 +148,28 @@ class SmsForwardingService : Service() {
 
         // Check if phone numbers are configured and if sender matches any of them
         if (settings.phoneNumbers.isNotEmpty()) {
-            val senderMatches = settings.phoneNumbers.any { configuredNumber ->
-                // Check for exact match or if the sender contains the configured number
-                smsSender == configuredNumber || 
-                smsSender.contains(configuredNumber) ||
-                configuredNumber.contains(smsSender)
-            }
-            
+            val senderMatches =
+                    settings.phoneNumbers.any { configuredNumber ->
+                        // Check for exact match or if the sender contains the configured number
+                        smsSender == configuredNumber ||
+                                smsSender.contains(configuredNumber) ||
+                                configuredNumber.contains(smsSender)
+                    }
+
             if (!senderMatches) {
-                logManager.logDebug(TAG, "SMS sender '$smsSender' does not match any configured phone numbers: ${settings.phoneNumbers}. Skipping API call")
+                logManager.logDebug(
+                        TAG,
+                        "SMS sender '$smsSender' does not match any configured phone numbers: ${settings.phoneNumbers}. Skipping API call"
+                )
                 return
             }
-            
-            logManager.logInfo(TAG, "SMS sender '$smsSender' matches configured phone numbers. Proceeding with API call")
+
+            logManager.logInfo(
+                    TAG,
+                    "SMS sender '$smsSender' matches configured phone numbers. Proceeding with API call"
+            )
         } else {
-            logManager.logWarning(TAG, "No phone numbers configured, sending all SMS to API")
-            return
+            logManager.logInfo(TAG, "No phone numbers configured, sending all SMS to API")
         }
 
         logManager.logInfo(TAG, "Sending SMS to API: sender=$smsSender, body=$smsBody")
@@ -168,9 +181,13 @@ class SmsForwardingService : Service() {
                         val connection = apiUrl.openConnection() as java.net.HttpURLConnection
                         connection.requestMethod = "POST"
                         connection.setRequestProperty("Content-Type", "application/json")
-                        connection.setRequestProperty(settings.authHeaderName, "Bearer ${settings.apiKey}")
+                        connection.setRequestProperty(
+                                settings.authHeaderName,
+                                "${settings.apiKey}"
+                        )
                         connection.doOutput = true
-                        // These numbers are set because the API will be a lambda, and it will not be provisioned,
+                        // These numbers are set because the API will be a lambda, and it will not
+                        // be provisioned,
                         // therefore keep some time for cold starts
                         connection.connectTimeout = 10000 // Set timeout for connection
                         connection.readTimeout = 10000 // Set timeout for reading response
@@ -203,11 +220,17 @@ class SmsForwardingService : Service() {
         return if (settingsJson != null) {
             try {
                 val jsonObject = JSONObject(settingsJson)
-                val url = if (jsonObject.optString("url", "").isNotEmpty()) jsonObject.optString("url", "") else null
-                val apiKey = if (jsonObject.optString("apiKey", "").isNotEmpty()) jsonObject.optString("apiKey", "") else null
+                val url =
+                        if (jsonObject.optString("url", "").isNotEmpty())
+                                jsonObject.optString("url", "")
+                        else null
+                val apiKey =
+                        if (jsonObject.optString("apiKey", "").isNotEmpty())
+                                jsonObject.optString("apiKey", "")
+                        else null
                 val authHeaderName = jsonObject.optString("authHeaderName", "Authorization")
                 val phoneNumbers = mutableListOf<String>()
-                
+
                 // Parse phone numbers array if it exists
                 if (jsonObject.has("phoneNumbers")) {
                     val phoneNumbersArray = jsonObject.getJSONArray("phoneNumbers")
@@ -215,7 +238,7 @@ class SmsForwardingService : Service() {
                         phoneNumbers.add(phoneNumbersArray.getString(i))
                     }
                 }
-                
+
                 AppSettings(url, apiKey, authHeaderName, phoneNumbers)
             } catch (e: Exception) {
                 logManager.logError(TAG, "Error parsing settings JSON: ${e.message}", e)
@@ -230,7 +253,6 @@ class SmsForwardingService : Service() {
     companion object {
         const val CHANNEL_ID = "SmsForwardingServiceChannel"
         const val NOTIFICATION_ID = 101 // Unique ID for your notification
-        const val ACTION_FORWARD_SMS_TO_API =
-                "com.github.dilrandi.sms_to_api.FORWARD_SMS_TO_API"
+        const val ACTION_FORWARD_SMS_TO_API = "com.github.dilrandi.sms_to_api.FORWARD_SMS_TO_API"
     }
 }
