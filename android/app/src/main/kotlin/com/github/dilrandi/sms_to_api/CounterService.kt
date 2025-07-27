@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import io.flutter.plugin.common.MethodChannel
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -19,6 +20,7 @@ class CounterService : Service() {
 
     private val TAG = "CounterService"
     private var counter: Int = 0 // The counter state
+    private lateinit var logManager: LogManager
 
     // Binder given to clients for local interaction
     private val binder = CounterBinder()
@@ -32,36 +34,42 @@ class CounterService : Service() {
         fun getService(): CounterService = this@CounterService
     }
 
+    fun setLogsMethodChannel(channel: MethodChannel?) {
+        logManager.setMethodChannel(channel)
+    }
+
     override fun onBind(intent: Intent?): IBinder? {
-        Log.d(TAG, "CounterService: onBind()")
+        logManager.logDebug(TAG, "CounterService: onBind()")
         return binder // Return the binder for clients (MainActivity) to interact
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
-        Log.d(TAG, "CounterService: onUnbind()")
+        logManager.logDebug(TAG, "CounterService: onUnbind()")
         // Returning true here means onRebind() will be called if clients bind again
         return true
     }
 
     override fun onRebind(intent: Intent?) {
-        Log.d(TAG, "CounterService: onRebind()")
+        logManager.logDebug(TAG, "CounterService: onRebind()")
         super.onRebind(intent)
     }
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "CounterService: onCreate()")
+        logManager = LogManager(this, null)
+        logManager.logInfo(TAG, "CounterService: onCreate()")
         createNotificationChannel() // Create notification channel for Android O+
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "CounterService: onStartCommand() - Intent Action: ${intent?.action}")
+        logManager.logDebug(TAG, "CounterService: onStartCommand() - Intent Action: ${intent?.action}")
 
         // Check if the intent is from SMSReceiver to increment counter
         if (intent?.action == ACTION_INCREMENT_COUNTER_FROM_SMS) {
             val smsSender = intent.getStringExtra("sms_sender")
             val smsBody = intent.getStringExtra("sms_body")
 
+            logManager.logInfo(TAG, "Received SMS from $smsSender with body: $smsBody")
             sendToApi(smsSender, smsBody) // Send SMS data to API
 
             incrementCounter()
@@ -97,7 +105,7 @@ class CounterService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d(TAG, "CounterService: onDestroy()")
+        logManager.logInfo(TAG, "CounterService: onDestroy()")
         // Clean up resources if any (e.g., stop threads, release sensors)
     }
 
@@ -107,7 +115,7 @@ class CounterService : Service() {
      */
     fun incrementCounter(): Int {
         counter++
-        Log.d(TAG, "Counter incremented to: $counter")
+        logManager.logInfo(TAG, "Counter incremented to: $counter")
         updateNotification() // Update the notification with the new counter value
         return counter
     }
@@ -117,7 +125,7 @@ class CounterService : Service() {
      * Flutter.
      */
     fun getCounter(): Int {
-        Log.d(TAG, "Current counter value requested: $counter")
+        logManager.logDebug(TAG, "Current counter value requested: $counter")
         return counter
     }
 
@@ -158,13 +166,13 @@ class CounterService : Service() {
 
     private fun sendToApi(smsSender: String?, smsBody: String?) {
         if (smsSender == null || smsBody == null) {
-            Log.w(TAG, "SMS sender or body is null, skipping API call")
+            logManager.logWarning(TAG, "SMS sender or body is null, skipping API call")
             return
         }
 
         val (url, apiKey, phoneNumbers) = getStoredSettings()
         if (url.isNullOrEmpty() || apiKey.isNullOrEmpty()) {
-            Log.w(TAG, "API URL or API Key not configured, skipping API call")
+            logManager.logWarning(TAG, "API URL or API Key not configured, skipping API call")
             return
         }
 
@@ -178,17 +186,17 @@ class CounterService : Service() {
             }
             
             if (!senderMatches) {
-                Log.d(TAG, "SMS sender '$smsSender' does not match any configured phone numbers: $phoneNumbers. Skipping API call")
+                logManager.logDebug(TAG, "SMS sender '$smsSender' does not match any configured phone numbers: $phoneNumbers. Skipping API call")
                 return
             }
             
-            Log.d(TAG, "SMS sender '$smsSender' matches configured phone numbers. Proceeding with API call")
+            logManager.logInfo(TAG, "SMS sender '$smsSender' matches configured phone numbers. Proceeding with API call")
         } else {
-            Log.d(TAG, "No phone numbers configured, sending all SMS to API")
+            logManager.logWarning(TAG, "No phone numbers configured, sending all SMS to API")
             return
         }
 
-        Log.d(TAG, "Sending SMS to API: sender=$smsSender, body=$smsBody")
+        logManager.logInfo(TAG, "Sending SMS to API: sender=$smsSender, body=$smsBody")
 
         // Use Kotlin's built-in HttpURLConnection for a simple HTTP POST
         Thread {
@@ -214,11 +222,11 @@ class CounterService : Service() {
                         outputStream.close()
 
                         val responseCode = connection.responseCode
-                        Log.d(TAG, "API Response Code: $responseCode")
+                        logManager.logInfo(TAG, "API Response Code: $responseCode")
                         connection.inputStream.close()
                         connection.disconnect()
                     } catch (e: Exception) {
-                        Log.e(TAG, "Error sending SMS to API: ${e.message}")
+                        logManager.logError(TAG, "Error sending SMS to API: ${e.message}", e)
                     }
                 }
                 .start()
@@ -246,11 +254,11 @@ class CounterService : Service() {
                 
                 Triple(url, apiKey, phoneNumbers)
             } catch (e: Exception) {
-                Log.e(TAG, "Error parsing settings JSON: ${e.message}")
+                logManager.logError(TAG, "Error parsing settings JSON: ${e.message}", e)
                 Triple(null, null, emptyList())
             }
         } else {
-            Log.d(TAG, "No settings found in SharedPreferences")
+            logManager.logDebug(TAG, "No settings found in SharedPreferences")
             Triple(null, null, emptyList())
         }
     }

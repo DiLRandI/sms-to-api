@@ -17,7 +17,9 @@ import android.Manifest
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.flutter_counter_service/counter"
+    private val LOGS_CHANNEL = "com.example.flutter_counter_service/logs"
     private lateinit var channel: MethodChannel
+    private lateinit var logsChannel: MethodChannel
 
     private var counterService: CounterService? = null
     private var isBound = false // To track if the activity is bound to the service
@@ -49,6 +51,8 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        logsChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, LOGS_CHANNEL)
+        
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "startCounterService" -> {

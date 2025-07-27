@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:sms_to_api/screen/logs.dart';
 import 'package:sms_to_api/screen/phone_numbers.dart';
 import 'package:sms_to_api/screen/settings.dart';
 import 'package:sms_to_api/service/api_service.dart';
+import 'package:sms_to_api/service/log_service.dart';
 import 'package:sms_to_api/storage/settings/storage.dart';
 
 class MyHomePage extends StatefulWidget {
@@ -17,6 +19,7 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   final _apiService = ApiService();
   final _storage = Storage();
+  final _logService = LogService();
   bool _isSettingsConfigured = false;
   bool _isApiReachable = false;
   bool _isCheckingApi = false;
@@ -28,12 +31,16 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _checkSettings() async {
+    await _logService.logDebug('UI', 'Checking application settings');
+
     // Check if settings are configured
     final settings = await _storage.load();
     final settingsConfigured =
         settings != null &&
         settings.url.isNotEmpty &&
         settings.apiKey.isNotEmpty;
+
+    await _logService.logInfo('UI', 'Settings configured: $settingsConfigured');
 
     setState(() {
       _isSettingsConfigured = settingsConfigured;
@@ -43,7 +50,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
     // Only check API reachability if settings are configured
     if (settingsConfigured) {
+      await _logService.logDebug('UI', 'Checking API reachability');
       final isReachable = await _apiService.validateApi();
+      await _logService.logInfo('UI', 'API reachable: $isReachable');
       setState(() {
         _isApiReachable = isReachable;
         _isCheckingApi = false;
@@ -67,9 +76,17 @@ class _MyHomePageState extends State<MyHomePage> {
   void initState() {
     super.initState();
     _checkSettings();
+
+    // Add logging for UI initialization
+    _logService.logDebug('UI', 'Home screen initialized');
+
     // Listen for method calls from the native side (e.g., service status updates)
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'onServiceStatusChanged') {
+        await _logService.logInfo(
+          'Service',
+          'Status changed: ${call.arguments}',
+        );
         setState(() {
           _serviceStatus = call.arguments as String;
         });
@@ -80,15 +97,18 @@ class _MyHomePageState extends State<MyHomePage> {
   // Method to start the native Android foreground service
   Future<void> _startService() async {
     try {
+      await _logService.logInfo('UI', 'Attempting to start background service');
       final String result = await _channel.invokeMethod('startCounterService');
       setState(() {
         _serviceStatus = result;
       });
+      await _logService.logInfo('UI', 'Service started successfully: $result');
       _showSnackBar("Service started: $result");
     } on PlatformException catch (e) {
       setState(() {
         _serviceStatus = "Failed to start: '${e.message}'";
       });
+      await _logService.logError('UI', 'Failed to start service: ${e.message}');
       debugPrint("Failed to start service: ${e.message}");
       _showSnackBar("Error starting service: ${e.message}");
     }
@@ -97,16 +117,19 @@ class _MyHomePageState extends State<MyHomePage> {
   // Method to stop the native Android foreground service
   Future<void> _stopService() async {
     try {
+      await _logService.logInfo('UI', 'Attempting to stop background service');
       final String result = await _channel.invokeMethod('stopCounterService');
       setState(() {
         _serviceStatus = result;
         _counter = 0; // Reset counter when service stops
       });
+      await _logService.logInfo('UI', 'Service stopped successfully: $result');
       _showSnackBar("Service stopped: $result");
     } on PlatformException catch (e) {
       setState(() {
         _serviceStatus = "Failed to stop: '${e.message}'";
       });
+      await _logService.logError('UI', 'Failed to stop service: ${e.message}');
       debugPrint("Failed to stop service: ${e.message}");
       _showSnackBar("Error stopping service: ${e.message}");
     }
@@ -579,6 +602,21 @@ class _MyHomePageState extends State<MyHomePage> {
             style: IconButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.secondary,
               foregroundColor: Theme.of(context).colorScheme.onSecondary,
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.list_alt),
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const LogsScreen()),
+              );
+            },
+            tooltip: 'View Logs',
+            style: IconButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.tertiary,
+              foregroundColor: Theme.of(context).colorScheme.onTertiary,
             ),
           ),
           const SizedBox(width: 8),
