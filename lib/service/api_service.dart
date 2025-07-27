@@ -43,7 +43,7 @@ class ApiService {
         Uri.parse(settings.url),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${settings.apiKey}',
+          settings.authHeaderName: '${settings.apiKey}',
         },
         body: jsonEncode({'test': true}),
       );

@@ -39,7 +39,7 @@
             android:value="2" />
 
       <service
-            android:name=".CounterService"
+            android:name=".SmsForwardingService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="dataSync" /> <!-- Specify foreground service type (API 29+) -->

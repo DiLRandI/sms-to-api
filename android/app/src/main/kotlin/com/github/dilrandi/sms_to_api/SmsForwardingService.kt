@@ -16,22 +16,28 @@ import io.flutter.plugin.common.MethodChannel
 import org.json.JSONArray
 import org.json.JSONObject
 
-class CounterService : Service() {
+data class AppSettings(
+    val url: String?,
+    val apiKey: String?,
+    val authHeaderName: String,
+    val phoneNumbers: List<String>
+)
 
-    private val TAG = "CounterService"
-    private var counter: Int = 0 // The counter state
+class SmsForwardingService : Service() {
+
+    private val TAG = "SmsForwardingService"
     private lateinit var logManager: LogManager
 
     // Binder given to clients for local interaction
-    private val binder = CounterBinder()
+    private val binder = SmsForwardingBinder()
 
     /**
      * Class used for the client Binder. Because we know this service always runs in the same
      * process as its clients, we don't need to deal with IPC.
      */
-    inner class CounterBinder : Binder() {
-        // Return this instance of CounterService so clients can call public methods
-        fun getService(): CounterService = this@CounterService
+    inner class SmsForwardingBinder : Binder() {
+        // Return this instance of SmsForwardingService so clients can call public methods
+        fun getService(): SmsForwardingService = this@SmsForwardingService
     }
 
     fun setLogsMethodChannel(channel: MethodChannel?) {
@@ -39,42 +45,40 @@ class CounterService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? {
-        logManager.logDebug(TAG, "CounterService: onBind()")
+        logManager.logDebug(TAG, "SmsForwardingService: onBind()")
         return binder // Return the binder for clients (MainActivity) to interact
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
-        logManager.logDebug(TAG, "CounterService: onUnbind()")
+        logManager.logDebug(TAG, "SmsForwardingService: onUnbind()")
         // Returning true here means onRebind() will be called if clients bind again
         return true
     }
 
     override fun onRebind(intent: Intent?) {
-        logManager.logDebug(TAG, "CounterService: onRebind()")
+        logManager.logDebug(TAG, "SmsForwardingService: onRebind()")
         super.onRebind(intent)
     }
 
     override fun onCreate() {
         super.onCreate()
         logManager = LogManager(this, null)
-        logManager.logInfo(TAG, "CounterService: onCreate() - Service starting up")
-        logManager.logDebug(TAG, "Initializing background SMS processing service")
+        logManager.logInfo(TAG, "SmsForwardingService: onCreate() - Service starting up")
+        logManager.logDebug(TAG, "Initializing SMS forwarding service")
         createNotificationChannel() // Create notification channel for Android O+
-        logManager.logInfo(TAG, "Service initialization completed successfully")
+        logManager.logInfo(TAG, "SMS forwarding service initialization completed successfully")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        logManager.logDebug(TAG, "CounterService: onStartCommand() - Intent Action: ${intent?.action}")
+        logManager.logDebug(TAG, "SmsForwardingService: onStartCommand() - Intent Action: ${intent?.action}")
 
-        // Check if the intent is from SMSReceiver to increment counter
-        if (intent?.action == ACTION_INCREMENT_COUNTER_FROM_SMS) {
-            val smsSender = intent.getStringExtra("sms_sender")
-            val smsBody = intent.getStringExtra("sms_body")
+        // Check if the intent is from SMSReceiver to forward SMS
+        if (intent?.action == ACTION_FORWARD_SMS_TO_API) {
+            val smsSender = intent?.getStringExtra("sms_sender")
+            val smsBody = intent?.getStringExtra("sms_body")
 
             logManager.logInfo(TAG, "Received SMS from $smsSender with body: $smsBody")
             sendToApi(smsSender, smsBody) // Send SMS data to API
-
-            incrementCounter()
         }
 
         // Build the notification for the foreground service
@@ -89,9 +93,9 @@ class CounterService : Service() {
 
         val notification =
                 NotificationCompat.Builder(this, CHANNEL_ID)
-                        .setContentTitle("Counter Service Running")
-                        .setContentText("Current Count: $counter") // You can update this later
-                        .setSmallIcon(R.drawable.ic_stat_name) // Use a proper icon for your app
+                        .setContentTitle("SMS Forwarding Service")
+                        .setContentText("Monitoring SMS messages for API forwarding")
+                        .setSmallIcon(android.R.drawable.ic_dialog_email) // Use built-in email icon
                         .setContentIntent(pendingIntent)
                         .setPriority(
                                 NotificationCompat.PRIORITY_LOW
@@ -107,28 +111,8 @@ class CounterService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        logManager.logInfo(TAG, "CounterService: onDestroy()")
+        logManager.logInfo(TAG, "SmsForwardingService: onDestroy()")
         // Clean up resources if any (e.g., stop threads, release sensors)
-    }
-
-    /**
-     * Public method to increment the counter. This will be called via MethodChannel from Flutter OR
-     * by an Intent from SmsReceiver.
-     */
-    fun incrementCounter(): Int {
-        counter++
-        logManager.logInfo(TAG, "Counter incremented to: $counter")
-        updateNotification() // Update the notification with the new counter value
-        return counter
-    }
-
-    /**
-     * Public method to get the current counter value. This will be called via MethodChannel from
-     * Flutter.
-     */
-    fun getCounter(): Int {
-        logManager.logDebug(TAG, "Current counter value requested: $counter")
-        return counter
     }
 
     // --- Notification Helper Methods ---
@@ -138,7 +122,7 @@ class CounterService : Service() {
             val serviceChannel =
                     NotificationChannel(
                             CHANNEL_ID,
-                            "Counter Service Channel",
+                            "SMS Forwarding Service Channel",
                             NotificationManager.IMPORTANCE_LOW // Importance LOW for less intrusive
                             // notification
                             )
@@ -147,40 +131,21 @@ class CounterService : Service() {
         }
     }
 
-    private fun updateNotification() {
-        val notificationIntent = Intent(this, MainActivity::class.java)
-        val pendingIntent =
-                PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE)
-
-        val notification =
-                NotificationCompat.Builder(this, CHANNEL_ID)
-                        .setContentTitle("Counter Service Running")
-                        .setContentText("Current Count: $counter")
-                        .setSmallIcon(R.drawable.ic_stat_name) // Use a proper icon for your app
-                        .setContentIntent(pendingIntent)
-                        .setPriority(NotificationCompat.PRIORITY_LOW)
-                        .build()
-
-        val notificationManager =
-                getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(NOTIFICATION_ID, notification)
-    }
-
     private fun sendToApi(smsSender: String?, smsBody: String?) {
         if (smsSender == null || smsBody == null) {
             logManager.logWarning(TAG, "SMS sender or body is null, skipping API call")
             return
         }
 
-        val (url, apiKey, phoneNumbers) = getStoredSettings()
-        if (url.isNullOrEmpty() || apiKey.isNullOrEmpty()) {
+        val settings = getStoredSettings()
+        if (settings.url.isNullOrEmpty() || settings.apiKey.isNullOrEmpty()) {
             logManager.logWarning(TAG, "API URL or API Key not configured, skipping API call")
             return
         }
 
         // Check if phone numbers are configured and if sender matches any of them
-        if (phoneNumbers.isNotEmpty()) {
-            val senderMatches = phoneNumbers.any { configuredNumber ->
+        if (settings.phoneNumbers.isNotEmpty()) {
+            val senderMatches = settings.phoneNumbers.any { configuredNumber ->
                 // Check for exact match or if the sender contains the configured number
                 smsSender == configuredNumber || 
                 smsSender.contains(configuredNumber) ||
@@ -188,7 +153,7 @@ class CounterService : Service() {
             }
             
             if (!senderMatches) {
-                logManager.logDebug(TAG, "SMS sender '$smsSender' does not match any configured phone numbers: $phoneNumbers. Skipping API call")
+                logManager.logDebug(TAG, "SMS sender '$smsSender' does not match any configured phone numbers: ${settings.phoneNumbers}. Skipping API call")
                 return
             }
             
@@ -203,11 +168,11 @@ class CounterService : Service() {
         // Use Kotlin's built-in HttpURLConnection for a simple HTTP POST
         Thread {
                     try {
-                        val apiUrl = java.net.URL(url)
+                        val apiUrl = java.net.URL(settings.url)
                         val connection = apiUrl.openConnection() as java.net.HttpURLConnection
                         connection.requestMethod = "POST"
                         connection.setRequestProperty("Content-Type", "application/json")
-                        connection.setRequestProperty("Authorization", "Bearer $apiKey")
+                        connection.setRequestProperty(settings.authHeaderName, "Bearer ${settings.apiKey}")
                         connection.doOutput = true
                         // These numbers are set because the API will be a lambda, and it will not be provisioned,
                         // therefore keep some time for cold starts
@@ -234,7 +199,7 @@ class CounterService : Service() {
                 .start()
     }
 
-    private fun getStoredSettings(): Triple<String?, String?, List<String>> {
+    private fun getStoredSettings(): AppSettings {
         val sharedPrefs: SharedPreferences =
                 getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         val settingsJson = sharedPrefs.getString("flutter.settings_data", null)
@@ -244,6 +209,7 @@ class CounterService : Service() {
                 val jsonObject = JSONObject(settingsJson)
                 val url = if (jsonObject.optString("url", "").isNotEmpty()) jsonObject.optString("url", "") else null
                 val apiKey = if (jsonObject.optString("apiKey", "").isNotEmpty()) jsonObject.optString("apiKey", "") else null
+                val authHeaderName = jsonObject.optString("authHeaderName", "Authorization")
                 val phoneNumbers = mutableListOf<String>()
                 
                 // Parse phone numbers array if it exists
@@ -254,21 +220,21 @@ class CounterService : Service() {
                     }
                 }
                 
-                Triple(url, apiKey, phoneNumbers)
+                AppSettings(url, apiKey, authHeaderName, phoneNumbers)
             } catch (e: Exception) {
                 logManager.logError(TAG, "Error parsing settings JSON: ${e.message}", e)
-                Triple(null, null, emptyList())
+                AppSettings(null, null, "Authorization", emptyList())
             }
         } else {
             logManager.logDebug(TAG, "No settings found in SharedPreferences")
-            Triple(null, null, emptyList())
+            AppSettings(null, null, "Authorization", emptyList())
         }
     }
 
     companion object {
-        const val CHANNEL_ID = "CounterServiceChannel"
+        const val CHANNEL_ID = "SmsForwardingServiceChannel"
         const val NOTIFICATION_ID = 101 // Unique ID for your notification
-        const val ACTION_INCREMENT_COUNTER_FROM_SMS =
-                "com.example.flutter_app.INCREMENT_COUNTER_FROM_SMS"
+        const val ACTION_FORWARD_SMS_TO_API =
+                "com.github.dilrandi.sms_to_api.FORWARD_SMS_TO_API"
     }
 }

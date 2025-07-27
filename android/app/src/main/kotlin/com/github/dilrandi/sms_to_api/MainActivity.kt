@@ -16,12 +16,12 @@ import android.content.pm.PackageManager
 import android.Manifest
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.github.dilrandi.sms_to_api_service/counter"
+    private val CHANNEL = "com.github.dilrandi.sms_to_api_service/sms_forwarding"
     private val LOGS_CHANNEL = "com.github.dilrandi.sms_to_api_service/logs"
     private lateinit var channel: MethodChannel
     private lateinit var logsChannel: MethodChannel
 
-    private var counterService: CounterService? = null
+    private var smsForwardingService: SmsForwardingService? = null
     private var isBound = false // To track if the activity is bound to the service
 
     private val NOTIFICATION_PERMISSION_REQUEST_CODE = 102
@@ -30,13 +30,13 @@ class MainActivity : FlutterActivity() {
     // Defines callbacks for service binding, unbinding, and re-binding.
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(className: ComponentName, service: IBinder) {
-            // We've bound to CounterService, cast the IBinder and get CounterService instance
-            val binder = service as CounterService.CounterBinder
-            counterService = binder.getService()
+            // We've bound to SmsForwardingService, cast the IBinder and get SmsForwardingService instance
+            val binder = service as SmsForwardingService.SmsForwardingBinder
+            smsForwardingService = binder.getService()
             isBound = true
             
             // Pass the logs channel to the service so it can send logs to Flutter
-            counterService?.setLogsMethodChannel(logsChannel)
+            smsForwardingService?.setLogsMethodChannel(logsChannel)
             
             Log.d("MainActivity", "Service Bound: isBound=$isBound")
             // Inform Flutter about the status change
@@ -45,7 +45,7 @@ class MainActivity : FlutterActivity() {
 
         override fun onServiceDisconnected(arg0: ComponentName) {
             isBound = false
-            counterService = null
+            smsForwardingService = null
             Log.d("MainActivity", "Service Disconnected: isBound=$isBound")
             // Inform Flutter about the status change
             channel.invokeMethod("onServiceStatusChanged", "Running & Unbound")
@@ -59,7 +59,7 @@ class MainActivity : FlutterActivity() {
         
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
-                "startCounterService" -> {
+                "startSmsForwardingService" -> {
                     // Request notification permission before starting foreground service (Android 13+)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -73,23 +73,23 @@ class MainActivity : FlutterActivity() {
                             return@setMethodCallHandler
                         }
                     }
-                    startCounterServiceInternal(result)
+                    startSmsForwardingServiceInternal(result)
                 }
-                "stopCounterService" -> {
-                    val intent = Intent(this, CounterService::class.java)
+                "stopSmsForwardingService" -> {
+                    val intent = Intent(this, SmsForwardingService::class.java)
                     stopService(intent)
                     // If the activity is bound, unbind it as the service is stopping
                     if (isBound) {
                         unbindService(connection)
                         isBound = false
-                        counterService = null
+                        smsForwardingService = null
                     }
                     channel.invokeMethod("onServiceStatusChanged", "Stopped")
                     result.success("Service stopped.")
                 }
-                "bindCounterService" -> {
+                "bindSmsForwardingService" -> {
                     if (!isBound) {
-                        val intent = Intent(this, CounterService::class.java)
+                        val intent = Intent(this, SmsForwardingService::class.java)
                         // BIND_AUTO_CREATE creates the service if it's not already running
                         // and binds to it. If it's already running, it just binds.
                         bindService(intent, connection, Context.BIND_AUTO_CREATE)
@@ -98,31 +98,15 @@ class MainActivity : FlutterActivity() {
                         result.success("Already Bound")
                     }
                 }
-                "unbindCounterService" -> {
+                "unbindSmsForwardingService" -> {
                     if (isBound) {
                         unbindService(connection)
                         isBound = false
-                        counterService = null
+                        smsForwardingService = null
                         result.success("Unbound")
                         channel.invokeMethod("onServiceStatusChanged", "Running & Unbound") // Service is still running in foreground
                     } else {
                         result.success("Not Bound")
-                    }
-                }
-                "incrementCounter" -> {
-                    if (isBound && counterService != null) {
-                        val newCounterValue = counterService!!.incrementCounter()
-                        result.success(newCounterValue)
-                    } else {
-                        result.error("UNBOUND_SERVICE", "Service is not bound. Please bind first.", null)
-                    }
-                }
-                "getCounter" -> {
-                    if (isBound && counterService != null) {
-                        val currentCounterValue = counterService!!.getCounter()
-                        result.success(currentCounterValue)
-                    } else {
-                        result.error("UNBOUND_SERVICE", "Service is not bound. Please bind first.", null)
                     }
                 }
                 else -> result.notImplemented()
@@ -130,8 +114,8 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun startCounterServiceInternal(result: MethodChannel.Result) {
-        val intent = Intent(this, CounterService::class.java)
+    private fun startSmsForwardingServiceInternal(result: MethodChannel.Result) {
+        val intent = Intent(this, SmsForwardingService::class.java)
         // For Android O and above, you must use startForegroundService()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent)
@@ -187,7 +171,7 @@ class MainActivity : FlutterActivity() {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     Log.d("MainActivity", "POST_NOTIFICATIONS permission granted.")
                     // If permission granted, try starting the service again
-                   startCounterServiceInternal(object : MethodChannel.Result {
+                   startSmsForwardingServiceInternal(object : MethodChannel.Result {
                     override fun success(result: Any?) {
                         channel.invokeMethod("onServiceStatusChanged", result as String)
                     }

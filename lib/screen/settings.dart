@@ -23,6 +23,7 @@ class _SettingsFormState extends State<_SettingsForm> {
   final _formKey = GlobalKey<FormState>();
   final _urlController = TextEditingController();
   final _apiKeyController = TextEditingController();
+  final _authHeaderController = TextEditingController();
 
   final Storage _storage = Storage();
 
@@ -45,6 +46,11 @@ class _SettingsFormState extends State<_SettingsForm> {
       setState(() {
         _urlController.text = settings.url;
         _apiKeyController.text = settings.apiKey;
+        _authHeaderController.text = settings.authHeaderName;
+      });
+    } else {
+      setState(() {
+        _authHeaderController.text = 'Authorization';
       });
     }
   }
@@ -105,6 +111,27 @@ class _SettingsFormState extends State<_SettingsForm> {
                         return null;
                       },
                     ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _authHeaderController,
+                      decoration: InputDecoration(
+                        labelText: 'HTTP Header Name',
+                        hintText: 'Authorization',
+                        prefixIcon: const Icon(Icons.security),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        helperText: 'Header name for API authentication',
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter a header name';
+                        }
+                        return null;
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -120,6 +147,7 @@ class _SettingsFormState extends State<_SettingsForm> {
                       Settings(
                         url: _urlController.text,
                         apiKey: _apiKeyController.text,
+                        authHeaderName: _authHeaderController.text,
                         phoneNumbers: existingSettings?.phoneNumbers ?? [],
                       ),
                     );
