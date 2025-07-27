@@ -21,6 +21,7 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _isSettingsConfigured = false;
   bool _isApiReachable = false;
   bool _isCheckingApi = false;
+  bool _hasValidatedApi = false; // Track if API validation has been attempted
 
   @override
   void didChangeDependencies() {
@@ -29,7 +30,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _checkSettings() async {
-    // Check if settings are configured
+    // Check if settings are configured (without API validation)
     final settings = await _storage.load();
     final settingsConfigured =
         settings != null &&
@@ -38,22 +39,44 @@ class _MyHomePageState extends State<MyHomePage> {
 
     setState(() {
       _isSettingsConfigured = settingsConfigured;
-      _isCheckingApi =
-          settingsConfigured; // Only check API if settings are configured
+      // Don't automatically check API anymore
+      _isCheckingApi = false;
+      _isApiReachable = false; // Reset API status
+      _hasValidatedApi = false; // Reset validation status
+    });
+  }
+
+  // Separate method for manual API validation
+  Future<void> _validateApi() async {
+    if (!_isSettingsConfigured) {
+      _showSnackBar("Please configure your API settings first");
+      return;
+    }
+
+    setState(() {
+      _isCheckingApi = true;
     });
 
-    // Only check API reachability if settings are configured
-    if (settingsConfigured) {
+    try {
       final isReachable = await _apiService.validateApi();
       setState(() {
         _isApiReachable = isReachable;
         _isCheckingApi = false;
+        _hasValidatedApi = true; // Mark that validation has been attempted
       });
-    } else {
+
+      _showSnackBar(
+        isReachable
+            ? "API validation successful!"
+            : "API validation failed - endpoint not reachable",
+      );
+    } catch (e) {
       setState(() {
         _isApiReachable = false;
         _isCheckingApi = false;
+        _hasValidatedApi = true; // Mark that validation has been attempted
       });
+      _showSnackBar("API validation error: $e");
     }
   }
 
@@ -248,17 +271,21 @@ class _MyHomePageState extends State<MyHomePage> {
               elevation: _isApiReachable ? 2 : 4,
               color: _isCheckingApi
                   ? Colors.blue.shade50
-                  : _isApiReachable
-                  ? Colors.green.shade50
-                  : Colors.orange.shade50,
+                  : _hasValidatedApi
+                  ? (_isApiReachable
+                        ? Colors.green.shade50
+                        : Colors.red.shade50)
+                  : Colors.grey.shade50,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
                 side: BorderSide(
                   color: _isCheckingApi
                       ? Colors.blue.shade200
-                      : _isApiReachable
-                      ? Colors.green.shade200
-                      : Colors.orange.shade200,
+                      : _hasValidatedApi
+                      ? (_isApiReachable
+                            ? Colors.green.shade200
+                            : Colors.red.shade200)
+                      : Colors.grey.shade200,
                   width: 1,
                 ),
               ),
@@ -271,9 +298,11 @@ class _MyHomePageState extends State<MyHomePage> {
                       decoration: BoxDecoration(
                         color: _isCheckingApi
                             ? Colors.blue.shade100
-                            : _isApiReachable
-                            ? Colors.green.shade100
-                            : Colors.orange.shade100,
+                            : _hasValidatedApi
+                            ? (_isApiReachable
+                                  ? Colors.green.shade100
+                                  : Colors.red.shade100)
+                            : Colors.grey.shade100,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: _isCheckingApi
@@ -288,12 +317,16 @@ class _MyHomePageState extends State<MyHomePage> {
                               ),
                             )
                           : Icon(
-                              _isApiReachable
-                                  ? Icons.cloud_done
-                                  : Icons.cloud_off,
-                              color: _isApiReachable
-                                  ? Colors.green
-                                  : Colors.orange,
+                              _hasValidatedApi
+                                  ? (_isApiReachable
+                                        ? Icons.cloud_done
+                                        : Icons.cloud_off)
+                                  : Icons.help_outline,
+                              color: _hasValidatedApi
+                                  ? (_isApiReachable
+                                        ? Colors.green
+                                        : Colors.red)
+                                  : Colors.grey,
                               size: 24,
                             ),
                     ),
@@ -311,16 +344,20 @@ class _MyHomePageState extends State<MyHomePage> {
                           Text(
                             _isCheckingApi
                                 ? 'Checking endpoint connectivity...'
-                                : _isApiReachable
-                                ? 'API endpoint is reachable and responding'
-                                : 'API endpoint is not reachable',
+                                : _hasValidatedApi
+                                ? (_isApiReachable
+                                      ? 'API endpoint is reachable and responding'
+                                      : 'API endpoint is not reachable')
+                                : 'Click "Validate API" to check endpoint connectivity',
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(
                                   color: _isCheckingApi
                                       ? Colors.blue.shade700
-                                      : _isApiReachable
-                                      ? Colors.green.shade700
-                                      : Colors.orange.shade700,
+                                      : _hasValidatedApi
+                                      ? (_isApiReachable
+                                            ? Colors.green.shade700
+                                            : Colors.red.shade700)
+                                      : Colors.grey.shade700,
                                 ),
                           ),
                         ],
@@ -458,22 +495,41 @@ class _MyHomePageState extends State<MyHomePage> {
               ],
             ),
             const SizedBox(height: 12),
-            // Test API button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _testApiCall,
-                icon: const Icon(Icons.send),
-                label: const Text('Test API'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+            // API action buttons
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _validateApi,
+                    icon: const Icon(Icons.check_circle),
+                    label: const Text('Validate API'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _testApiCall,
+                    icon: const Icon(Icons.send),
+                    label: const Text('Test API'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
