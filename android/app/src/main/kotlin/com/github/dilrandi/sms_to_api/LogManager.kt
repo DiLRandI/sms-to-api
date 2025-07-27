@@ -3,13 +3,12 @@ package com.github.dilrandi.sms_to_api
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
-import io.flutter.plugin.common.MethodChannel
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
 
-class LogManager(private val context: Context, private var methodChannel: MethodChannel?) {
+class LogManager(private val context: Context) {
 
     private val TAG = "LogManager"
     private val LOGS_KEY = "app_logs"
@@ -27,26 +26,22 @@ class LogManager(private val context: Context, private var methodChannel: Method
     fun logDebug(tag: String, message: String) {
         Log.d(tag, message)
         saveLogToStorage("DEBUG", tag, message)
-        notifyFlutter("DEBUG", tag, message)
     }
 
     fun logInfo(tag: String, message: String) {
         Log.i(tag, message)
         saveLogToStorage("INFO", tag, message)
-        notifyFlutter("INFO", tag, message)
     }
 
     fun logWarning(tag: String, message: String) {
         Log.w(tag, message)
         saveLogToStorage("WARNING", tag, message)
-        notifyFlutter("WARNING", tag, message)
     }
 
     fun logError(tag: String, message: String, throwable: Throwable? = null) {
         Log.e(tag, message, throwable)
         val stackTrace = throwable?.stackTraceToString()
         saveLogToStorage("ERROR", tag, message, stackTrace)
-        notifyFlutter("ERROR", tag, message)
     }
 
     private fun saveLogToStorage(level: String, tag: String, message: String, stackTrace: String? = null) {
@@ -84,26 +79,10 @@ class LogManager(private val context: Context, private var methodChannel: Method
         }
     }
 
-    private fun notifyFlutter(level: String, tag: String, message: String) {
-        try {
-            methodChannel?.invokeMethod("onNewLog", mapOf(
-                "level" to level,
-                "tag" to tag,
-                "message" to message
-            ))
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to notify Flutter about new log: ${e.message}")
-        }
-    }
-
     private fun generateId(): String {
         val chars = "abcdefghijklmnopqrstuvwxyz0123456789"
         return (1..8)
             .map { chars.random() }
             .joinToString("")
-    }
-
-    fun setMethodChannel(channel: MethodChannel?) {
-        methodChannel = channel
     }
 }

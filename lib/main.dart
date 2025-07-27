@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:sms_to_api/screen/home.dart';
-import 'package:sms_to_api/service/log_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize the log service to listen for Android logs only
-  final logService = LogService();
-  await logService.initializeLogListener();
-
+  // LogService now reads directly from storage, no initialization needed
   runApp(const MyApp());
 }
 

@@ -40,10 +40,6 @@ class SmsForwardingService : Service() {
         fun getService(): SmsForwardingService = this@SmsForwardingService
     }
 
-    fun setLogsMethodChannel(channel: MethodChannel?) {
-        logManager.setMethodChannel(channel)
-    }
-
     override fun onBind(intent: Intent?): IBinder? {
         logManager.logDebug(TAG, "SmsForwardingService: onBind()")
         return binder // Return the binder for clients (MainActivity) to interact
@@ -62,7 +58,7 @@ class SmsForwardingService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        logManager = LogManager(this, null)
+        logManager = LogManager(this)
         logManager.logInfo(TAG, "SmsForwardingService: onCreate() - Service starting up")
         logManager.logDebug(TAG, "Initializing SMS forwarding service")
         createNotificationChannel() // Create notification channel for Android O+

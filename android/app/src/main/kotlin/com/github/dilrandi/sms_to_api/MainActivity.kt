@@ -17,9 +17,7 @@ import android.Manifest
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.github.dilrandi.sms_to_api_service/sms_forwarding"
-    private val LOGS_CHANNEL = "com.github.dilrandi.sms_to_api_service/logs"
     private lateinit var channel: MethodChannel
-    private lateinit var logsChannel: MethodChannel
 
     private var smsForwardingService: SmsForwardingService? = null
     private var isBound = false // To track if the activity is bound to the service
@@ -34,9 +32,6 @@ class MainActivity : FlutterActivity() {
             val binder = service as SmsForwardingService.SmsForwardingBinder
             smsForwardingService = binder.getService()
             isBound = true
-            
-            // Pass the logs channel to the service so it can send logs to Flutter
-            smsForwardingService?.setLogsMethodChannel(logsChannel)
             
             Log.d("MainActivity", "Service Bound: isBound=$isBound")
             // Inform Flutter about the status change
@@ -55,7 +50,6 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
-        logsChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, LOGS_CHANNEL)
         
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
