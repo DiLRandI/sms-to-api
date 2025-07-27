@@ -5,18 +5,9 @@ import 'package:sms_to_api/service/log_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize the log service
+  // Initialize the log service to listen for Android logs only
   final logService = LogService();
   await logService.initializeLogListener();
-
-  // Add some initial logs
-  await logService.logInfo('App', 'Application started');
-  await logService.logDebug('App', 'Initializing SMS to API service');
-  await logService.logInfo('System', 'Log system initialized');
-
-  // Add some sample logs for testing
-  await logService.logWarning('Settings', 'No API configuration found');
-  await logService.logDebug('UI', 'Building main application widget');
 
   runApp(const MyApp());
 }

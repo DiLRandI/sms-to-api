@@ -57,8 +57,10 @@ class CounterService : Service() {
     override fun onCreate() {
         super.onCreate()
         logManager = LogManager(this, null)
-        logManager.logInfo(TAG, "CounterService: onCreate()")
+        logManager.logInfo(TAG, "CounterService: onCreate() - Service starting up")
+        logManager.logDebug(TAG, "Initializing background SMS processing service")
         createNotificationChannel() // Create notification channel for Android O+
+        logManager.logInfo(TAG, "Service initialization completed successfully")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

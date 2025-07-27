@@ -16,8 +16,8 @@ import android.content.pm.PackageManager
 import android.Manifest
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.example.flutter_counter_service/counter"
-    private val LOGS_CHANNEL = "com.example.flutter_counter_service/logs"
+    private val CHANNEL = "com.github.dilrandi.sms_to_api_service/counter"
+    private val LOGS_CHANNEL = "com.github.dilrandi.sms_to_api_service/logs"
     private lateinit var channel: MethodChannel
     private lateinit var logsChannel: MethodChannel
 
@@ -34,6 +34,10 @@ class MainActivity : FlutterActivity() {
             val binder = service as CounterService.CounterBinder
             counterService = binder.getService()
             isBound = true
+            
+            // Pass the logs channel to the service so it can send logs to Flutter
+            counterService?.setLogsMethodChannel(logsChannel)
+            
             Log.d("MainActivity", "Service Bound: isBound=$isBound")
             // Inform Flutter about the status change
             channel.invokeMethod("onServiceStatusChanged", "Running & Bound")
@@ -134,6 +138,12 @@ class MainActivity : FlutterActivity() {
         } else {
             startService(intent)
         }
+        
+        // Also bind to the service to establish the logs channel connection
+        if (!isBound) {
+            bindService(intent, connection, Context.BIND_AUTO_CREATE)
+        }
+        
         channel.invokeMethod("onServiceStatusChanged", "Running")
         result.success("Service started.")
     }

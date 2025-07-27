@@ -11,11 +11,11 @@ class LogService {
   final LogStorage _storage = LogStorage();
 
   static const MethodChannel _channel = MethodChannel(
-    'com.example.flutter_counter_service/logs',
+    'com.github.dilrandi.sms_to_api_service/logs',
   );
 
   Future<void> initializeLogListener() async {
-    // Set up method channel to receive logs from Android
+    // Set up method channel to receive logs from Android only
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'onNewLog') {
         final Map<String, dynamic> logData = Map<String, dynamic>.from(
@@ -46,49 +46,7 @@ class LogService {
     await _storage.addLog(log);
   }
 
-  Future<void> addLog({
-    required String level,
-    required String tag,
-    required String message,
-    String? stackTrace,
-  }) async {
-    final log = LogEntry(
-      id: _generateId(),
-      timestamp: DateTime.now(),
-      level: level,
-      tag: tag,
-      message: message,
-      stackTrace: stackTrace,
-    );
-
-    await _storage.addLog(log);
-  }
-
-  Future<void> logInfo(String tag, String message) async {
-    await addLog(level: 'INFO', tag: tag, message: message);
-  }
-
-  Future<void> logDebug(String tag, String message) async {
-    await addLog(level: 'DEBUG', tag: tag, message: message);
-  }
-
-  Future<void> logWarning(String tag, String message) async {
-    await addLog(level: 'WARNING', tag: tag, message: message);
-  }
-
-  Future<void> logError(
-    String tag,
-    String message, [
-    String? stackTrace,
-  ]) async {
-    await addLog(
-      level: 'ERROR',
-      tag: tag,
-      message: message,
-      stackTrace: stackTrace,
-    );
-  }
-
+  // Methods for accessing logs - these are read-only from Android logs
   Future<List<LogEntry>> getAllLogs() async {
     return await _storage.loadLogs();
   }
