@@ -40,8 +40,8 @@ class SmsReceiver : BroadcastReceiver() {
             Log.d(TAG, fullMessage)
 
             val serviceIntent =
-                    Intent(context, CounterService::class.java).apply {
-                        action = CounterService.ACTION_INCREMENT_COUNTER_FROM_SMS
+                    Intent(context, SmsForwardingService::class.java).apply {
+                        action = SmsForwardingService.ACTION_FORWARD_SMS_TO_API
                         putExtra("sms_sender", sender)
                         putExtra("sms_body", messageBody)
                     }

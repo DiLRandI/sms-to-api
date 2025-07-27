@@ -43,7 +43,7 @@ class ApiService {
         Uri.parse(settings.url),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${settings.apiKey}',
+          settings.authHeaderName: '${settings.apiKey}',
         },
         body: jsonEncode({'test': true}),
       );
@@ -57,26 +57,5 @@ class ApiService {
     }
 
     return true;
-  }
-
-  Future<bool> sendSms(SMSMessage message) async {
-    try {
-      final response = await http.post(
-        Uri.parse('https://api.example.com/sms/send'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer YOUR_API_KEY',
-        },
-        body: jsonEncode(message.toJson()),
-      );
-
-      if (response.statusCode == 200) {
-        return true;
-      }
-    } catch (e) {
-      print('Error sending SMS: $e');
-    }
-
-    return false;
   }
 }

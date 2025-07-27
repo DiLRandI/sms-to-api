@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:sms_to_api/screen/home.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // LogService now reads directly from storage, no initialization needed
   runApp(const MyApp());
 }
 
