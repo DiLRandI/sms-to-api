@@ -31,32 +31,44 @@ class SmsReceiver : BroadcastReceiver() {
             return
         }
 
-        // Process each SMS message
+        // Concatenate all SMS parts into a single message
+        val messageBuilder = StringBuilder()
+        var sender: String? = null
+        var messageCount = 0
+
         for (smsMessage in messages) {
-            val sender = smsMessage.displayOriginatingAddress
-            val messageBody = smsMessage.messageBody
-
-            val fullMessage = "SMS from: $sender\nMessage: $messageBody"
-            Log.d(TAG, fullMessage)
-
-            val serviceIntent =
-                    Intent(context, SmsForwardingService::class.java).apply {
-                        action = SmsForwardingService.ACTION_FORWARD_SMS_TO_API
-                        putExtra("sms_sender", sender)
-                        putExtra("sms_body", messageBody)
-                    }
-
-            // Start the service appropriately based on Android version
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(serviceIntent)
-                } else {
-                    context.startService(serviceIntent)
-                }
-                Log.d(TAG, "Sent intent to CounterService to increment counter.")
-            } catch (e: IllegalStateException) {
-                Log.e(TAG, "Failed to start CounterService: ${e.message}")
+            if (sender == null) {
+                sender = smsMessage.displayOriginatingAddress
             }
+            messageBuilder.append(smsMessage.messageBody)
+            messageCount++
+        }
+
+        val completeMessageBody = messageBuilder.toString()
+        val fullMessage = "SMS from: $sender\nMessage: $completeMessageBody (Parts: $messageCount)"
+        Log.d(TAG, fullMessage)
+
+        // Send the complete concatenated message as a single API call
+        val serviceIntent =
+                Intent(context, SmsForwardingService::class.java).apply {
+                    action = SmsForwardingService.ACTION_FORWARD_SMS_TO_API
+                    putExtra("sms_sender", sender)
+                    putExtra("sms_body", completeMessageBody)
+                    putExtra("sms_parts_count", messageCount)
+                    // Indicate the service can stop itself after handling this work
+                    putExtra("auto_stop", true)
+                }
+
+        // Start the service appropriately based on Android version
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(serviceIntent)
+            } else {
+                context.startService(serviceIntent)
+            }
+            Log.d(TAG, "Sent intent to SmsForwardingService with complete message (${messageCount} parts).")
+        } catch (e: IllegalStateException) {
+            Log.e(TAG, "Failed to start SmsForwardingService: ${e.message}")
         }
     }
 }

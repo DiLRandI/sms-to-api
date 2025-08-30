@@ -12,7 +12,7 @@ class LogManager(private val context: Context) {
 
     private val TAG = "LogManager"
     private val LOGS_KEY = "app_logs"
-    private val MAX_LOGS = 1000
+    private val MAX_LOGS = 300 // keep persistent logs bounded to a smaller size
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
 
     init {
@@ -24,13 +24,13 @@ class LogManager(private val context: Context) {
     }
 
     fun logDebug(tag: String, message: String) {
+        // Debug logs go to logcat only to avoid excessive disk churn
         Log.d(tag, message)
-        saveLogToStorage("DEBUG", tag, message)
     }
 
     fun logInfo(tag: String, message: String) {
+        // Info logs to logcat only; persist only warnings/errors
         Log.i(tag, message)
-        saveLogToStorage("INFO", tag, message)
     }
 
     fun logWarning(tag: String, message: String) {
