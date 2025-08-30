@@ -56,6 +56,16 @@ architecture-beta
    flutter run
    ```
 
+## Development
+
+- Install deps: `flutter pub get`
+- Run app: `flutter run -d <device>`
+- Analyze: `flutter analyze`
+- Test: `flutter test` or `flutter test --coverage`
+- Build APK: `flutter build apk --release`
+- Build AAB: `flutter build appbundle`
+- Format: `dart format lib test` (or `flutter format .`)
+
 ## Configuration
 
 Go to the **Settings** screen in the app to set your API URL and API key. These are required for the app to forward SMS messages.
@@ -79,6 +89,36 @@ Go to the **Settings** screen in the app to set your API URL and API key. These 
 - `shared_preferences`: Local storage for settings
 - `http`: HTTP requests
 - (and any other dependencies listed in `pubspec.yaml`)
+
+## Coding Style
+
+- Dart/Flutter with 2‑space indentation.
+- Prefer `const` widgets and `final` where possible.
+- Follow `flutter_lints` (configured in `analysis_options.yaml`).
+- Resolve warnings before pushing/PRs. Format with `dart format lib test`.
+
+## Testing
+
+- Framework: `flutter_test` with `WidgetTester`.
+- Tests live under `test/` and end with `_test.dart`.
+- Run: `flutter test` (fast, deterministic tests preferred).
+- Coverage: `flutter test --coverage` (outputs `coverage/lcov.info`).
+
+## Android Notes
+
+- Requires SMS permissions and a foreground service to receive messages reliably.
+- Validate on a real device for background delivery and service behavior.
+- Ensure app is exempt from battery optimizations if necessary.
+
+## Security
+
+- Do not commit secrets. Configure API URL and API key in the app Settings.
+- Settings are stored via `shared_preferences` on device.
+- Validate API connectivity using the in‑app validation before release testing.
+
+## Contributing
+
+Please see `CONTRIBUTING.md` for commit conventions, PR expectations, and testing requirements.
 
 ## License
 
