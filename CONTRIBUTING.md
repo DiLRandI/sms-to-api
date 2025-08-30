@@ -61,3 +61,6 @@ Thanks for your interest in contributing to sms_to_api! This document outlines h
 - Build APK: `flutter build apk --release`
 - Build App Bundle: `flutter build appbundle`
 
+## License of Contributions
+
+By contributing to this repository, you agree that your contributions are licensed under the MIT License. You certify that you have the right to submit the work under this license and that you have the authority to do so.
