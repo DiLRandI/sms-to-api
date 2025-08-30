@@ -551,12 +551,6 @@ class _MyHomePageState extends State<MyHomePage> {
             icon: const Icon(Icons.refresh_rounded),
             onPressed: _checkSettings,
             tooltip: 'Refresh Status',
-            style: IconButton.styleFrom(
-              backgroundColor: Theme.of(
-                context,
-              ).colorScheme.surfaceContainerHighest,
-              foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
           ),
           const SizedBox(width: 8),
           IconButton(
@@ -570,10 +564,6 @@ class _MyHomePageState extends State<MyHomePage> {
               );
             },
             tooltip: 'Phone Numbers',
-            style: IconButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.secondary,
-              foregroundColor: Theme.of(context).colorScheme.onSecondary,
-            ),
           ),
           const SizedBox(width: 8),
           IconButton(
@@ -585,10 +575,6 @@ class _MyHomePageState extends State<MyHomePage> {
               );
             },
             tooltip: 'View Logs',
-            style: IconButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.tertiary,
-              foregroundColor: Theme.of(context).colorScheme.onTertiary,
-            ),
           ),
           const SizedBox(width: 8),
           IconButton(
@@ -602,10 +588,6 @@ class _MyHomePageState extends State<MyHomePage> {
               _checkSettings();
             },
             tooltip: 'Settings',
-            style: IconButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Theme.of(context).colorScheme.onPrimary,
-            ),
           ),
           const SizedBox(width: 16),
         ],

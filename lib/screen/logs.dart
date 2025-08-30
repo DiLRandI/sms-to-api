@@ -18,6 +18,7 @@ class _LogsScreenState extends State<LogsScreen> {
   bool _isLoading = true;
   final List<String> _logLevels = ['ALL', 'DEBUG', 'INFO', 'WARNING', 'ERROR'];
   List<String> _availableTags = ['ALL'];
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -69,6 +70,18 @@ class _LogsScreenState extends State<LogsScreen> {
     if (_selectedTag != 'ALL') {
       filteredLogs = filteredLogs
           .where((log) => log.tag == _selectedTag)
+          .toList();
+    }
+
+    // Text search filter
+    if (_searchQuery.trim().isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      filteredLogs = filteredLogs
+          .where(
+            (log) =>
+                log.message.toLowerCase().contains(q) ||
+                log.tag.toLowerCase().contains(q),
+          )
           .toList();
     }
 
@@ -323,65 +336,86 @@ class _LogsScreenState extends State<LogsScreen> {
                 ),
               ),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _selectedLevel,
-                    decoration: const InputDecoration(
-                      labelText: 'Level',
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                    ),
-                    items: _logLevels.map((level) {
-                      return DropdownMenuItem(
-                        value: level,
-                        child: Row(
-                          children: [
-                            if (level != 'ALL') ...[
-                              Icon(
-                                _getLogLevelIcon(level),
-                                size: 16,
-                                color: _getLogLevelColor(level),
-                              ),
-                              const SizedBox(width: 8),
-                            ],
-                            Text(level),
-                          ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _selectedLevel,
+                        decoration: const InputDecoration(
+                          labelText: 'Level',
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                         ),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedLevel = value!;
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _selectedTag,
-                    decoration: const InputDecoration(
-                      labelText: 'Tag',
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
+                        items: _logLevels.map((level) {
+                          return DropdownMenuItem(
+                            value: level,
+                            child: Row(
+                              children: [
+                                if (level != 'ALL') ...[
+                                  Icon(
+                                    _getLogLevelIcon(level),
+                                    size: 16,
+                                    color: _getLogLevelColor(level),
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
+                                Text(level),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedLevel = value!;
+                          });
+                        },
                       ),
                     ),
-                    items: _availableTags.map((tag) {
-                      return DropdownMenuItem(value: tag, child: Text(tag));
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedTag = value!;
-                      });
-                    },
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _selectedTag,
+                        decoration: const InputDecoration(
+                          labelText: 'Tag',
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                        ),
+                        items: _availableTags.map((tag) {
+                          return DropdownMenuItem(value: tag, child: Text(tag));
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedTag = value!;
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Search logs...',
+                    isDense: true,
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                  },
                 ),
               ],
             ),
