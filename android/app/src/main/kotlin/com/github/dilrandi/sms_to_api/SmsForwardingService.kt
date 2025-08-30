@@ -42,7 +42,11 @@ class SmsForwardingService : Service() {
     fun testApiCall() {
         logManager.logInfo(TAG, "Manual API test initiated")
         // Call the private sendToApi method for testing
-        sendToApi("TEST_SENDER", "This is a test message for API verification - triggered manually", 1)
+        sendToApi(
+                "TEST_SENDER",
+                "This is a test message for API verification - triggered manually",
+                1
+        )
     }
 
     override fun onBind(intent: Intent?): IBinder? {
@@ -85,10 +89,15 @@ class SmsForwardingService : Service() {
             val smsPartsCount = intent?.getIntExtra("sms_parts_count", 1) ?: 1
             val autoStop = intent?.getBooleanExtra("auto_stop", false) ?: false
 
+            // Truncate body in logs for readability/privacy; keep full body for API payload
+            val safeBody = (smsBody ?: "").let { if (it.length > 160) it.take(160) + "…" else it }
             if (smsPartsCount > 1) {
-                logManager.logInfo(TAG, "Received multi-part SMS ($smsPartsCount parts) from $smsSender with complete body: $smsBody")
+                logManager.logInfo(
+                        TAG,
+                        "Received multi-part SMS ($smsPartsCount parts) from $smsSender with body: $safeBody"
+                )
             } else {
-                logManager.logInfo(TAG, "Received SMS from $smsSender with body: $smsBody")
+                logManager.logInfo(TAG, "Received SMS from $smsSender with body: $safeBody")
             }
             // Send SMS data to API
             sendToApi(smsSender, smsBody, smsPartsCount, autoStop, startId)
@@ -189,7 +198,12 @@ class SmsForwardingService : Service() {
         }
 
         val messageInfo = if (smsPartsCount > 1) "multi-part SMS ($smsPartsCount parts)" else "SMS"
-        logManager.logInfo(TAG, "Sending $messageInfo to API: sender=$smsSender, body=$smsBody")
+        val safeBodyForSendLog =
+                (smsBody ?: "").let { if (it.length > 160) it.take(160) + "…" else it }
+        logManager.logInfo(
+                TAG,
+                "Sending $messageInfo to API: sender=$smsSender, body=$safeBodyForSendLog"
+        )
 
         // Use Kotlin's built-in HttpURLConnection for a simple HTTP POST
         Thread {
@@ -198,10 +212,7 @@ class SmsForwardingService : Service() {
                         val connection = apiUrl.openConnection() as java.net.HttpURLConnection
                         connection.requestMethod = "POST"
                         connection.setRequestProperty("Content-Type", "application/json")
-                        connection.setRequestProperty(
-                                settings.authHeaderName,
-                                "${settings.apiKey}"
-                        )
+                        connection.setRequestProperty(settings.authHeaderName, "${settings.apiKey}")
                         connection.doOutput = true
                         // These numbers are set because the API will be a lambda, and it will not
                         // be provisioned,
@@ -221,7 +232,19 @@ class SmsForwardingService : Service() {
                         outputStream.close()
 
                         val responseCode = connection.responseCode
-                        logManager.logInfo(TAG, "API Response Code: $responseCode")
+                        when {
+                            responseCode >= 500 ->
+                                    logManager.logError(
+                                            TAG,
+                                            "API request failed with server error ($responseCode)"
+                                    )
+                            responseCode >= 400 ->
+                                    logManager.logWarning(
+                                            TAG,
+                                            "API request failed with client error ($responseCode)"
+                                    )
+                            else -> logManager.logInfo(TAG, "API request succeeded ($responseCode)")
+                        }
                         try {
                             if (responseCode >= 400) {
                                 connection.errorStream?.close()
@@ -235,14 +258,15 @@ class SmsForwardingService : Service() {
                     } catch (e: Exception) {
                         logManager.logError(TAG, "Error sending SMS to API: ${e.message}", e)
                     } finally {
-                        // If started by receiver and not bound by any client, stop foreground + service
+                        // If started by receiver and not bound by any client, stop foreground +
+                        // service
                         if (autoStopWhenDone && boundClients == 0) {
                             try {
                                 stopForeground(true)
-                            } catch (_: Exception) { }
+                            } catch (_: Exception) {}
                             try {
                                 stopSelf(serviceStartId)
-                            } catch (_: Exception) { }
+                            } catch (_: Exception) {}
                         }
                     }
                 }

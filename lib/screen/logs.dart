@@ -409,141 +409,174 @@ class _LogsScreenState extends State<LogsScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : filteredLogs.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.article_outlined,
-                          size: 64,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withOpacity(0.3),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No logs found',
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withOpacity(0.6),
-                              ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Logs will appear here when the service runs',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withOpacity(0.5),
-                              ),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: filteredLogs.length,
-                    itemBuilder: (context, index) {
-                      final log = filteredLogs[index];
-                      return Card(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        child: ListTile(
-                          leading: Icon(
-                            _getLogLevelIcon(log.level),
-                            color: _getLogLevelColor(log.level),
-                            size: 20,
-                          ),
-                          title: Text(
-                            log.message,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                : RefreshIndicator(
+                    onRefresh: _loadLogs,
+                    child: filteredLogs.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
                             children: [
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: _getLogLevelColor(
-                                        log.level,
-                                      ).withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: _getLogLevelColor(
-                                          log.level,
-                                        ).withOpacity(0.3),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      log.level,
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: _getLogLevelColor(log.level),
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
+                              Padding(
+                                padding: const EdgeInsets.only(top: 80),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.article_outlined,
+                                      size: 64,
                                       color: Theme.of(
                                         context,
-                                      ).colorScheme.secondaryContainer,
-                                      borderRadius: BorderRadius.circular(8),
+                                      ).colorScheme.onSurface.withOpacity(0.3),
                                     ),
-                                    child: Text(
-                                      log.tag,
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onSecondaryContainer,
-                                      ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'No logs found',
+                                      textAlign: TextAlign.center,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .headlineSmall
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withOpacity(0.6),
+                                          ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                log.timestamp.toString().split(
-                                  '.',
-                                )[0], // Remove microseconds
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurface.withOpacity(0.6),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Logs will appear here when the service runs',
+                                      textAlign: TextAlign.center,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withOpacity(0.5),
+                                          ),
                                     ),
+                                  ],
+                                ),
                               ),
                             ],
+                          )
+                        : ListView.builder(
+                            itemCount: filteredLogs.length,
+                            itemBuilder: (context, index) {
+                              final log = filteredLogs[index];
+                              final accent = _getLogLevelColor(log.level);
+                              return Card(
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    border: Border(
+                                      left: BorderSide(color: accent, width: 4),
+                                    ),
+                                  ),
+                                  child: ListTile(
+                                    leading: Icon(
+                                      _getLogLevelIcon(log.level),
+                                      color: accent,
+                                      size: 20,
+                                    ),
+                                    title: Text(
+                                      log.message,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    subtitle: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 6,
+                                                    vertical: 2,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: accent.withOpacity(0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                border: Border.all(
+                                                  color: accent.withOpacity(
+                                                    0.3,
+                                                  ),
+                                                ),
+                                              ),
+                                              child: Text(
+                                                log.level,
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  color: accent,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 6,
+                                                    vertical: 2,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .secondaryContainer,
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: Text(
+                                                log.tag,
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .onSecondaryContainer,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          log.timestamp
+                                              .toLocal()
+                                              .toString()
+                                              .split('.')
+                                              .first,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .onSurface
+                                                    .withOpacity(0.6),
+                                              ),
+                                        ),
+                                      ],
+                                    ),
+                                    onTap: () => _showLogDetails(log),
+                                    trailing: log.stackTrace != null
+                                        ? const Icon(
+                                            Icons.error_outline,
+                                            color: Colors.red,
+                                            size: 16,
+                                          )
+                                        : null,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
-                          onTap: () => _showLogDetails(log),
-                          trailing: log.stackTrace != null
-                              ? Icon(
-                                  Icons.error_outline,
-                                  color: Colors.red,
-                                  size: 16,
-                                )
-                              : null,
-                        ),
-                      );
-                    },
                   ),
           ),
         ],
