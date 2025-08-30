@@ -48,6 +48,7 @@ class _PhoneNumbersScreenState extends State<PhoneNumbersScreen> {
       final updatedSettings = Settings(
         url: currentSettings?.url ?? '',
         apiKey: currentSettings?.apiKey ?? '',
+        authHeaderName: currentSettings?.authHeaderName ?? 'Authorization',
         phoneNumbers: _phoneNumbers,
       );
 

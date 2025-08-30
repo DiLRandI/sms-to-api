@@ -37,6 +37,7 @@ class _SettingsFormState extends State<_SettingsForm> {
   void dispose() {
     _urlController.dispose();
     _apiKeyController.dispose();
+    _authHeaderController.dispose();
     super.dispose();
   }
 

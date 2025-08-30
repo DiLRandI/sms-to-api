@@ -23,11 +23,7 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _isCheckingApi = false;
   bool _hasValidatedApi = false; // Track if API validation has been attempted
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _checkSettings();
-  }
+  // Settings are loaded during initState and refreshed explicitly by user actions.
 
   Future<void> _checkSettings() async {
     // Check if settings are configured (without API validation)
