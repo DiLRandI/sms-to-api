@@ -7,11 +7,19 @@ class LogService {
   factory LogService() => _instance;
   LogService._internal();
 
-  // Read logs directly from Android storage (same key used by LogManager.kt)
-  static const String _androidLogsKey = 'flutter.app_logs';
+  // Read logs directly from Android storage. Use logical key without the
+  // 'flutter.' prefix — the shared_preferences plugin handles prefixing.
+  static const String _androidLogsKey = 'app_logs';
+  static const int _maxLogs = 300;
 
   Future<List<LogEntry>> getAllLogs() async {
     final prefs = await SharedPreferences.getInstance();
+    // Force a refresh from disk so logs written by Android are visible immediately
+    try {
+      await prefs.reload();
+    } catch (_) {
+      // Ignore if reload is unavailable on older plugin versions
+    }
     final logsJson = prefs.getString(_androidLogsKey) ?? '[]';
 
     try {
@@ -25,12 +33,75 @@ class LogService {
           level: logData['level'] ?? 'INFO',
           tag: logData['tag'] ?? 'Unknown',
           message: logData['message'] ?? '',
+          stackTrace: logData['stackTrace'],
         );
       }).toList();
     } catch (e) {
       // If parsing fails, return empty list
       return [];
     }
+  }
+
+  Future<void> logInfo(String tag, String message) async {
+    await _appendLog(level: 'INFO', tag: tag, message: message);
+  }
+
+  Future<void> logWarning(String tag, String message) async {
+    await _appendLog(level: 'WARNING', tag: tag, message: message);
+  }
+
+  Future<void> logError(
+    String tag,
+    String message, {
+    String? stackTrace,
+  }) async {
+    await _appendLog(
+      level: 'ERROR',
+      tag: tag,
+      message: message,
+      stackTrace: stackTrace,
+    );
+  }
+
+  Future<void> _appendLog({
+    required String level,
+    required String tag,
+    required String message,
+    String? stackTrace,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    // Try to read existing array string written by Android side
+    List<dynamic> logsList;
+    try {
+      final existing = prefs.getString(_androidLogsKey) ?? '[]';
+      logsList = jsonDecode(existing);
+      if (logsList is! List) logsList = [];
+    } catch (_) {
+      logsList = [];
+    }
+
+    final entry = {
+      'id': _generateId(),
+      'timestamp': DateTime.now().toUtc().toIso8601String(),
+      'level': level,
+      'tag': tag,
+      'message': message,
+      if (stackTrace != null) 'stackTrace': stackTrace,
+    };
+    logsList.add(entry);
+
+    // Bound to last N items
+    if (logsList.length > _maxLogs) {
+      logsList = logsList.sublist(logsList.length - _maxLogs);
+    }
+
+    await prefs.setString(_androidLogsKey, jsonEncode(logsList));
+  }
+
+  String _generateId() {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    final t = DateTime.now().microsecondsSinceEpoch;
+    return List.generate(8, (i) => chars[(t + i) % chars.length]).join();
   }
 
   Future<List<LogEntry>> getLogsByLevel(String level) async {

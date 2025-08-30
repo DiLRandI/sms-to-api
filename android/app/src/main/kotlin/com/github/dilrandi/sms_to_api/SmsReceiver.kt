@@ -6,8 +6,6 @@ import android.content.Intent
 import android.os.Build
 import android.provider.Telephony
 import android.telephony.SmsMessage
-import android.util.Log
-import android.widget.Toast
 
 class SmsReceiver : BroadcastReceiver() {
 
@@ -19,7 +17,11 @@ class SmsReceiver : BroadcastReceiver() {
                         intent == null ||
                         intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION
         ) {
-            Log.w(TAG, "Invalid intent or action received: ${intent?.action}")
+            // Use LogManager for warnings to surface in Flutter UI
+            context?.let {
+                LogManager(it)
+                        .logWarning(TAG, "Invalid intent or action received: ${intent?.action}")
+            }
             return
         }
 
@@ -27,7 +29,7 @@ class SmsReceiver : BroadcastReceiver() {
         val messages: Array<SmsMessage>? = Telephony.Sms.Intents.getMessagesFromIntent(intent)
 
         if (messages.isNullOrEmpty()) {
-            Log.w(TAG, "No SMS messages found in the intent.")
+            LogManager(context).logWarning(TAG, "No SMS messages found in the intent.")
             return
         }
 
@@ -46,7 +48,8 @@ class SmsReceiver : BroadcastReceiver() {
 
         val completeMessageBody = messageBuilder.toString()
         val fullMessage = "SMS from: $sender\nMessage: $completeMessageBody (Parts: $messageCount)"
-        Log.d(TAG, fullMessage)
+        // Route debug to LogManager (non-persistent), still visible in logcat
+        LogManager(context).logDebug(TAG, fullMessage)
 
         // Send the complete concatenated message as a single API call
         val serviceIntent =
@@ -66,9 +69,14 @@ class SmsReceiver : BroadcastReceiver() {
             } else {
                 context.startService(serviceIntent)
             }
-            Log.d(TAG, "Sent intent to SmsForwardingService with complete message (${messageCount} parts).")
+            LogManager(context)
+                    .logDebug(
+                            TAG,
+                            "Sent intent to SmsForwardingService with complete message (${messageCount} parts)."
+                    )
         } catch (e: IllegalStateException) {
-            Log.e(TAG, "Failed to start SmsForwardingService: ${e.message}")
+            LogManager(context)
+                    .logError(TAG, "Failed to start SmsForwardingService: ${e.message}", e)
         }
     }
 }

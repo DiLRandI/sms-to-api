@@ -48,13 +48,13 @@ class ApiService {
     try {
       final response = await http
           .post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          settings.authHeaderName: '${settings.apiKey}',
-        },
-        body: jsonEncode({'test': true}),
-      )
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              settings.authHeaderName: '${settings.apiKey}',
+            },
+            body: jsonEncode({'test': true}),
+          )
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode != 200) {

@@ -3,10 +3,10 @@ package com.github.dilrandi.sms_to_api
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
-import org.json.JSONArray
-import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
+import org.json.JSONArray
+import org.json.JSONObject
 
 class LogManager(private val context: Context) {
 
@@ -29,8 +29,9 @@ class LogManager(private val context: Context) {
     }
 
     fun logInfo(tag: String, message: String) {
-        // Info logs to logcat only; persist only warnings/errors
+        // Log to logcat and persist INFO to SharedPreferences so the Flutter UI can display it
         Log.i(tag, message)
+        saveLogToStorage("INFO", tag, message)
     }
 
     fun logWarning(tag: String, message: String) {
@@ -44,22 +45,28 @@ class LogManager(private val context: Context) {
         saveLogToStorage("ERROR", tag, message, stackTrace)
     }
 
-    private fun saveLogToStorage(level: String, tag: String, message: String, stackTrace: String? = null) {
+    private fun saveLogToStorage(
+            level: String,
+            tag: String,
+            message: String,
+            stackTrace: String? = null
+    ) {
         try {
             val sharedPrefs = getSharedPreferences()
             val existingLogsJson = sharedPrefs.getString("flutter.$LOGS_KEY", "[]")
             val logsArray = JSONArray(existingLogsJson)
 
-            val logEntry = JSONObject().apply {
-                put("id", generateId())
-                put("timestamp", dateFormat.format(Date()))
-                put("level", level)
-                put("tag", tag)
-                put("message", message)
-                if (stackTrace != null) {
-                    put("stackTrace", stackTrace)
-                }
-            }
+            val logEntry =
+                    JSONObject().apply {
+                        put("id", generateId())
+                        put("timestamp", dateFormat.format(Date()))
+                        put("level", level)
+                        put("tag", tag)
+                        put("message", message)
+                        if (stackTrace != null) {
+                            put("stackTrace", stackTrace)
+                        }
+                    }
 
             logsArray.put(logEntry)
 
@@ -70,10 +77,7 @@ class LogManager(private val context: Context) {
                 limitedLogs.put(logsArray.getJSONObject(i))
             }
 
-            sharedPrefs.edit()
-                .putString("flutter.$LOGS_KEY", limitedLogs.toString())
-                .apply()
-
+            sharedPrefs.edit().putString("flutter.$LOGS_KEY", limitedLogs.toString()).apply()
         } catch (e: Exception) {
             Log.e(TAG, "Failed to save log to storage: ${e.message}")
         }
@@ -81,8 +85,6 @@ class LogManager(private val context: Context) {
 
     private fun generateId(): String {
         val chars = "abcdefghijklmnopqrstuvwxyz0123456789"
-        return (1..8)
-            .map { chars.random() }
-            .joinToString("")
+        return (1..8).map { chars.random() }.joinToString("")
     }
 }
