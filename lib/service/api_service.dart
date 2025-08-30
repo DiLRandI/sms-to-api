@@ -51,7 +51,7 @@ class ApiService {
             uri,
             headers: {
               'Content-Type': 'application/json',
-              settings.authHeaderName: '${settings.apiKey}',
+              settings.authHeaderName: settings.apiKey,
             },
             body: jsonEncode({'test': true}),
           )

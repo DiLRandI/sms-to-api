@@ -141,6 +141,7 @@ class _SettingsFormState extends State<_SettingsForm> {
             ElevatedButton(
               onPressed: () async {
                 if (_formKey.currentState!.validate()) {
+                  final messenger = ScaffoldMessenger.of(context);
                   try {
                     // Load existing settings to preserve phone numbers
                     final existingSettings = await _storage.load();
@@ -152,7 +153,7 @@ class _SettingsFormState extends State<_SettingsForm> {
                         phoneNumbers: existingSettings?.phoneNumbers ?? [],
                       ),
                     );
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    messenger.showSnackBar(
                       SnackBar(
                         content: Text(
                           saved
@@ -163,7 +164,7 @@ class _SettingsFormState extends State<_SettingsForm> {
                       ),
                     );
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    messenger.showSnackBar(
                       SnackBar(
                         content: Text('Error saving settings: $e'),
                         backgroundColor: Colors.red,

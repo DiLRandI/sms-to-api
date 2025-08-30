@@ -314,10 +314,12 @@ class _LogsScreenState extends State<LogsScreen> {
             decoration: BoxDecoration(
               color: Theme.of(
                 context,
-              ).colorScheme.surfaceVariant.withOpacity(0.3),
+              ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
               border: Border(
                 bottom: BorderSide(
-                  color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outline.withValues(alpha: 0.2),
                 ),
               ),
             ),
@@ -325,7 +327,7 @@ class _LogsScreenState extends State<LogsScreen> {
               children: [
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: _selectedLevel,
+                    initialValue: _selectedLevel,
                     decoration: const InputDecoration(
                       labelText: 'Level',
                       isDense: true,
@@ -362,7 +364,7 @@ class _LogsScreenState extends State<LogsScreen> {
                 const SizedBox(width: 16),
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: _selectedTag,
+                    initialValue: _selectedTag,
                     decoration: const InputDecoration(
                       labelText: 'Tag',
                       isDense: true,
@@ -423,9 +425,10 @@ class _LogsScreenState extends State<LogsScreen> {
                                     Icon(
                                       Icons.article_outlined,
                                       size: 64,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurface.withOpacity(0.3),
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withValues(alpha: 0.3),
                                     ),
                                     const SizedBox(height: 16),
                                     Text(
@@ -438,7 +441,7 @@ class _LogsScreenState extends State<LogsScreen> {
                                             color: Theme.of(context)
                                                 .colorScheme
                                                 .onSurface
-                                                .withOpacity(0.6),
+                                                .withValues(alpha: 0.6),
                                           ),
                                     ),
                                     const SizedBox(height: 8),
@@ -452,7 +455,7 @@ class _LogsScreenState extends State<LogsScreen> {
                                             color: Theme.of(context)
                                                 .colorScheme
                                                 .onSurface
-                                                .withOpacity(0.5),
+                                                .withValues(alpha: 0.5),
                                           ),
                                     ),
                                   ],
@@ -501,12 +504,14 @@ class _LogsScreenState extends State<LogsScreen> {
                                                     vertical: 2,
                                                   ),
                                               decoration: BoxDecoration(
-                                                color: accent.withOpacity(0.1),
+                                                color: accent.withValues(
+                                                  alpha: 0.1,
+                                                ),
                                                 borderRadius:
                                                     BorderRadius.circular(8),
                                                 border: Border.all(
-                                                  color: accent.withOpacity(
-                                                    0.3,
+                                                  color: accent.withValues(
+                                                    alpha: 0.3,
                                                   ),
                                                 ),
                                               ),
@@ -559,7 +564,7 @@ class _LogsScreenState extends State<LogsScreen> {
                                                 color: Theme.of(context)
                                                     .colorScheme
                                                     .onSurface
-                                                    .withOpacity(0.6),
+                                                    .withValues(alpha: 0.6),
                                               ),
                                         ),
                                       ],

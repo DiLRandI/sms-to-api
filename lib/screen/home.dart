@@ -552,7 +552,9 @@ class _MyHomePageState extends State<MyHomePage> {
             onPressed: _checkSettings,
             tooltip: 'Refresh Status',
             style: IconButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest,
               foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
@@ -608,7 +610,7 @@ class _MyHomePageState extends State<MyHomePage> {
           const SizedBox(width: 16),
         ],
       ),
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
