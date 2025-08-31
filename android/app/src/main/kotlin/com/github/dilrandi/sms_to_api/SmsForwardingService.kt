@@ -13,11 +13,20 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import org.json.JSONObject
 
+data class Endpoint(
+        val id: String,
+        val name: String,
+        val url: String,
+        val apiKey: String,
+        val active: Boolean
+)
+
 data class AppSettings(
-        val url: String?,
-        val apiKey: String?,
+        val url: String?, // legacy
+        val apiKey: String?, // legacy
         val authHeaderName: String,
-        val phoneNumbers: List<String>
+        val phoneNumbers: List<String>,
+        val endpoints: List<Endpoint>
 )
 
 class SmsForwardingService : Service() {
@@ -99,7 +108,7 @@ class SmsForwardingService : Service() {
             } else {
                 logManager.logInfo(TAG, "Received SMS from $smsSender with body: $safeBody")
             }
-            // Send SMS data to API
+            // Send SMS data to API(s)
             sendToApi(smsSender, smsBody, smsPartsCount, autoStop, startId)
         }
 
@@ -166,8 +175,24 @@ class SmsForwardingService : Service() {
         }
 
         val settings = getStoredSettings()
-        if (settings.url.isNullOrEmpty() || settings.apiKey.isNullOrEmpty()) {
-            logManager.logWarning(TAG, "API URL or API Key not configured, skipping API call")
+
+        // Build list of active endpoints (prefer new multi-endpoint config; fallback to legacy)
+        val activeEndpoints: List<Endpoint> =
+                if (settings.endpoints.isNotEmpty()) settings.endpoints.filter { it.active }
+                else if (!settings.url.isNullOrEmpty() && !settings.apiKey.isNullOrEmpty())
+                        listOf(
+                                Endpoint(
+                                        id = "legacy",
+                                        name = "Default",
+                                        url = settings.url!!,
+                                        apiKey = settings.apiKey!!,
+                                        active = true
+                                )
+                        )
+                else emptyList()
+
+        if (activeEndpoints.isEmpty()) {
+            logManager.logWarning(TAG, "No active API endpoints configured, skipping API call")
             return
         }
 
@@ -202,64 +227,74 @@ class SmsForwardingService : Service() {
                 (smsBody ?: "").let { if (it.length > 160) it.take(160) + "…" else it }
         logManager.logInfo(
                 TAG,
-                "Sending $messageInfo to API: sender=$smsSender, body=$safeBodyForSendLog"
+                "Sending $messageInfo to ${activeEndpoints.size} API endpoint(s): sender=$smsSender, body=$safeBodyForSendLog"
         )
 
         // Use Kotlin's built-in HttpURLConnection for a simple HTTP POST
         Thread {
                     try {
-                        val apiUrl = java.net.URL(settings.url)
-                        val connection = apiUrl.openConnection() as java.net.HttpURLConnection
-                        connection.requestMethod = "POST"
-                        connection.setRequestProperty("Content-Type", "application/json")
-                        connection.setRequestProperty(settings.authHeaderName, "${settings.apiKey}")
-                        connection.doOutput = true
-                        // These numbers are set because the API will be a lambda, and it will not
-                        // be provisioned,
-                        // therefore keep some time for cold starts
-                        connection.connectTimeout = 10000 // Set timeout for connection
-                        connection.readTimeout = 10000 // Set timeout for reading response
+                        for (endpoint in activeEndpoints) {
+                            try {
+                                val apiUrl = java.net.URL(endpoint.url)
+                                val connection =
+                                        apiUrl.openConnection() as java.net.HttpURLConnection
+                                connection.requestMethod = "POST"
+                                connection.setRequestProperty("Content-Type", "application/json")
+                                connection.setRequestProperty(
+                                        settings.authHeaderName,
+                                        endpoint.apiKey
+                                )
+                                connection.doOutput = true
+                                connection.connectTimeout = 10000
+                                connection.readTimeout = 10000
 
-                        val jsonBody = JSONObject()
-                        jsonBody.put("sender", smsSender)
-                        jsonBody.put("body", smsBody)
-                        jsonBody.put("parts_count", smsPartsCount)
-                        jsonBody.put("is_multipart", smsPartsCount > 1)
+                                val jsonBody = JSONObject()
+                                jsonBody.put("sender", smsSender)
+                                jsonBody.put("body", smsBody)
+                                jsonBody.put("parts_count", smsPartsCount)
+                                jsonBody.put("is_multipart", smsPartsCount > 1)
+                                jsonBody.put("endpoint_name", endpoint.name)
 
-                        val outputStream = connection.outputStream
-                        outputStream.write(jsonBody.toString().toByteArray(Charsets.UTF_8))
-                        outputStream.flush()
-                        outputStream.close()
+                                val outputStream = connection.outputStream
+                                outputStream.write(jsonBody.toString().toByteArray(Charsets.UTF_8))
+                                outputStream.flush()
+                                outputStream.close()
 
-                        val responseCode = connection.responseCode
-                        when {
-                            responseCode >= 500 ->
-                                    logManager.logError(
-                                            TAG,
-                                            "API request failed with server error ($responseCode)"
-                                    )
-                            responseCode >= 400 ->
-                                    logManager.logWarning(
-                                            TAG,
-                                            "API request failed with client error ($responseCode)"
-                                    )
-                            else -> logManager.logInfo(TAG, "API request succeeded ($responseCode)")
-                        }
-                        try {
-                            if (responseCode >= 400) {
-                                connection.errorStream?.close()
-                            } else {
-                                connection.inputStream?.close()
+                                val responseCode = connection.responseCode
+                                when {
+                                    responseCode >= 500 ->
+                                            logManager.logError(
+                                                    TAG,
+                                                    "${endpoint.name}: server error ($responseCode)"
+                                            )
+                                    responseCode >= 400 ->
+                                            logManager.logWarning(
+                                                    TAG,
+                                                    "${endpoint.name}: client error ($responseCode)"
+                                            )
+                                    else ->
+                                            logManager.logInfo(
+                                                    TAG,
+                                                    "${endpoint.name}: request succeeded ($responseCode)"
+                                            )
+                                }
+                                try {
+                                    if (responseCode >= 400) {
+                                        connection.errorStream?.close()
+                                    } else {
+                                        connection.inputStream?.close()
+                                    }
+                                } catch (_: Exception) {}
+                                connection.disconnect()
+                            } catch (e: Exception) {
+                                logManager.logError(
+                                        TAG,
+                                        "${endpoint.name}: error sending SMS: ${e.message}",
+                                        e
+                                )
                             }
-                        } catch (_: Exception) {
-                            // ignore
                         }
-                        connection.disconnect()
-                    } catch (e: Exception) {
-                        logManager.logError(TAG, "Error sending SMS to API: ${e.message}", e)
                     } finally {
-                        // If started by receiver and not bound by any client, stop foreground +
-                        // service
                         if (autoStopWhenDone && boundClients == 0) {
                             try {
                                 stopForeground(true)
@@ -300,14 +335,31 @@ class SmsForwardingService : Service() {
                     }
                 }
 
-                AppSettings(url, apiKey, authHeaderName, phoneNumbers)
+                // Parse endpoints array if it exists
+                val endpoints = mutableListOf<Endpoint>()
+                if (jsonObject.has("endpoints")) {
+                    val arr = jsonObject.getJSONArray("endpoints")
+                    for (i in 0 until arr.length()) {
+                        val o = arr.getJSONObject(i)
+                        val id = o.optString("id", i.toString())
+                        val name = o.optString("name", "Endpoint ${i + 1}")
+                        val epUrl = o.optString("url", "")
+                        val epKey = o.optString("apiKey", "")
+                        val active = o.optBoolean("active", true)
+                        if (epUrl.isNotEmpty() && epKey.isNotEmpty()) {
+                            endpoints.add(Endpoint(id, name, epUrl, epKey, active))
+                        }
+                    }
+                }
+
+                AppSettings(url, apiKey, authHeaderName, phoneNumbers, endpoints)
             } catch (e: Exception) {
                 logManager.logError(TAG, "Error parsing settings JSON: ${e.message}", e)
-                AppSettings(null, null, "Authorization", emptyList())
+                AppSettings(null, null, "Authorization", emptyList(), emptyList())
             }
         } else {
             logManager.logDebug(TAG, "No settings found in SharedPreferences")
-            AppSettings(null, null, "Authorization", emptyList())
+            AppSettings(null, null, "Authorization", emptyList(), emptyList())
         }
     }
 

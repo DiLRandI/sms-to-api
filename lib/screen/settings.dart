@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sms_to_api/storage/settings/storage.dart';
 import 'package:sms_to_api/storage/settings/type.dart';
+import 'package:sms_to_api/screen/api_endpoints.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -36,10 +37,8 @@ class _SettingsForm extends StatefulWidget {
 
 class _SettingsFormState extends State<_SettingsForm> {
   final _formKey = GlobalKey<FormState>();
-  final _urlController = TextEditingController();
-  final _apiKeyController = TextEditingController();
   final _authHeaderController = TextEditingController();
-  bool _apiKeyObscured = true;
+  int _endpointsCount = 0;
 
   final Storage _storage = Storage();
 
@@ -51,8 +50,6 @@ class _SettingsFormState extends State<_SettingsForm> {
 
   @override
   void dispose() {
-    _urlController.dispose();
-    _apiKeyController.dispose();
     _authHeaderController.dispose();
     super.dispose();
   }
@@ -61,13 +58,13 @@ class _SettingsFormState extends State<_SettingsForm> {
     final settings = await _storage.load();
     if (settings != null) {
       setState(() {
-        _urlController.text = settings.url;
-        _apiKeyController.text = settings.apiKey;
         _authHeaderController.text = settings.authHeaderName;
+        _endpointsCount = settings.endpoints.length;
       });
     } else {
       setState(() {
         _authHeaderController.text = 'Authorization';
+        _endpointsCount = 0;
       });
     }
   }
@@ -92,57 +89,6 @@ class _SettingsFormState extends State<_SettingsForm> {
                 child: Column(
                   children: [
                     TextFormField(
-                      controller: _urlController,
-                      decoration: InputDecoration(
-                        labelText: 'API URL',
-                        prefixIcon: const Icon(Icons.link),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        filled: true,
-                        fillColor: Colors.grey[50],
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter API URL';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _apiKeyController,
-                      decoration: InputDecoration(
-                        labelText: 'API Key',
-                        prefixIcon: const Icon(Icons.key),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _apiKeyObscured
-                                ? Icons.visibility_off
-                                : Icons.visibility,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _apiKeyObscured = !_apiKeyObscured;
-                            });
-                          },
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        filled: true,
-                        fillColor: Colors.grey[50],
-                      ),
-                      obscureText: _apiKeyObscured,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter API Key';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
                       controller: _authHeaderController,
                       decoration: InputDecoration(
                         labelText: 'HTTP Header Name',
@@ -162,6 +108,22 @@ class _SettingsFormState extends State<_SettingsForm> {
                         return null;
                       },
                     ),
+                    const SizedBox(height: 16),
+                    ListTile(
+                      leading: const Icon(Icons.cloud),
+                      title: const Text('Manage API Endpoints'),
+                      subtitle: Text('$_endpointsCount configured'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ApiEndpointsScreen(),
+                          ),
+                        );
+                        await _loadSettings();
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -172,12 +134,13 @@ class _SettingsFormState extends State<_SettingsForm> {
                 if (_formKey.currentState!.validate()) {
                   final messenger = ScaffoldMessenger.of(context);
                   try {
-                    // Load existing settings to preserve phone numbers
+                    // Load existing settings to preserve endpoints and phone numbers
                     final existingSettings = await _storage.load();
                     var saved = await _storage.save(
                       Settings(
-                        url: _urlController.text,
-                        apiKey: _apiKeyController.text,
+                        url: existingSettings?.url ?? '',
+                        apiKey: existingSettings?.apiKey ?? '',
+                        endpoints: existingSettings?.endpoints ?? const [],
                         authHeaderName: _authHeaderController.text,
                         phoneNumbers: existingSettings?.phoneNumbers ?? [],
                       ),
