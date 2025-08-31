@@ -8,8 +8,23 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: Center(child: _SettingsForm()),
+      appBar: AppBar(
+        title: const Text('Settings'),
+        elevation: 0,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: _SettingsForm(),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -24,6 +39,7 @@ class _SettingsFormState extends State<_SettingsForm> {
   final _urlController = TextEditingController();
   final _apiKeyController = TextEditingController();
   final _authHeaderController = TextEditingController();
+  bool _apiKeyObscured = true;
 
   final Storage _storage = Storage();
 
@@ -62,6 +78,7 @@ class _SettingsFormState extends State<_SettingsForm> {
       padding: const EdgeInsets.all(24.0),
       child: Form(
         key: _formKey,
+        autovalidateMode: AutovalidateMode.onUserInteraction,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -98,13 +115,25 @@ class _SettingsFormState extends State<_SettingsForm> {
                       decoration: InputDecoration(
                         labelText: 'API Key',
                         prefixIcon: const Icon(Icons.key),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _apiKeyObscured
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _apiKeyObscured = !_apiKeyObscured;
+                            });
+                          },
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                         filled: true,
                         fillColor: Colors.grey[50],
                       ),
-                      obscureText: true,
+                      obscureText: _apiKeyObscured,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please enter API Key';
@@ -141,6 +170,7 @@ class _SettingsFormState extends State<_SettingsForm> {
             ElevatedButton(
               onPressed: () async {
                 if (_formKey.currentState!.validate()) {
+                  final messenger = ScaffoldMessenger.of(context);
                   try {
                     // Load existing settings to preserve phone numbers
                     final existingSettings = await _storage.load();
@@ -152,7 +182,7 @@ class _SettingsFormState extends State<_SettingsForm> {
                         phoneNumbers: existingSettings?.phoneNumbers ?? [],
                       ),
                     );
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    messenger.showSnackBar(
                       SnackBar(
                         content: Text(
                           saved
@@ -163,7 +193,7 @@ class _SettingsFormState extends State<_SettingsForm> {
                       ),
                     );
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    messenger.showSnackBar(
                       SnackBar(
                         content: Text('Error saving settings: $e'),
                         backgroundColor: Colors.red,

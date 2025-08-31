@@ -75,7 +75,6 @@ class LogService {
     try {
       final existing = prefs.getString(_androidLogsKey) ?? '[]';
       logsList = jsonDecode(existing);
-      if (logsList is! List) logsList = [];
     } catch (_) {
       logsList = [];
     }

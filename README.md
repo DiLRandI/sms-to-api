@@ -1,6 +1,8 @@
 
 # sms_to_api
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Forward SMS messages to a REST API using Flutter.
 
 ## Overview
@@ -21,6 +23,7 @@ architecture-beta
 ```
 
 **Diagram Explanation:**
+
 - The Flutter app receives SMS messages, processes them, and forwards them to a REST API endpoint.
 - The architecture is modular, separating SMS reception and API forwarding logic.
 
@@ -43,15 +46,20 @@ architecture-beta
 ### Installation
 
 1. Clone the repository:
+
    ```sh
    git clone <repo-url>
    cd sms-to-api
    ```
+
 2. Install dependencies:
+
    ```sh
    flutter pub get
    ```
+
 3. Run the app:
+
    ```sh
    flutter run
    ```
@@ -122,4 +130,6 @@ Please see `CONTRIBUTING.md` for commit conventions, PR expectations, and testin
 
 ## License
 
-This project is private and not published to pub.dev.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+You are free to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the software, subject to the terms of the MIT License.

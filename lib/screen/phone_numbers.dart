@@ -14,10 +14,12 @@ class _PhoneNumbersScreenState extends State<PhoneNumbersScreen> {
   final TextEditingController _phoneController = TextEditingController();
   List<String> _phoneNumbers = [];
   bool _isLoading = true;
+  bool _canAdd = false;
 
   @override
   void initState() {
     super.initState();
+    _phoneController.addListener(_onPhoneChanged);
     _loadPhoneNumbers();
   }
 
@@ -59,6 +61,13 @@ class _PhoneNumbersScreenState extends State<PhoneNumbersScreen> {
     }
   }
 
+  void _onPhoneChanged() {
+    final phoneNumber = _phoneController.text.trim();
+    setState(() {
+      _canAdd = phoneNumber.isNotEmpty && !_phoneNumbers.contains(phoneNumber);
+    });
+  }
+
   void _addPhoneNumber() {
     final phoneNumber = _phoneController.text.trim();
     if (phoneNumber.isNotEmpty && !_phoneNumbers.contains(phoneNumber)) {
@@ -94,8 +103,9 @@ class _PhoneNumbersScreenState extends State<PhoneNumbersScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Phone Numbers'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        elevation: 0,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -126,31 +136,37 @@ class _PhoneNumbersScreenState extends State<PhoneNumbersScreen> {
                                 child: TextField(
                                   controller: _phoneController,
                                   decoration: InputDecoration(
-                                    labelText: 'Phone Number',
+                                    labelText: 'Phone Number or Sender ID',
                                     hintText:
                                         'e.g., +941234567890, 1234567890, HNB, 8899',
                                     prefixIcon: const Icon(Icons.phone),
+                                    suffixIcon: (_phoneController.text.isEmpty)
+                                        ? null
+                                        : IconButton(
+                                            icon: const Icon(Icons.clear),
+                                            onPressed: () =>
+                                                _phoneController.clear(),
+                                          ),
+                                    helperText:
+                                        'Add numbers or short-codes to match incoming SMS senders',
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     filled: true,
                                     fillColor: Colors.grey[50],
                                   ),
-                                  onSubmitted: (_) => _addPhoneNumber(),
+                                  textInputAction: TextInputAction.done,
+                                  onSubmitted: (_) {
+                                    if (_canAdd) _addPhoneNumber();
+                                  },
                                 ),
                               ),
                               const SizedBox(width: 12),
                               ElevatedButton.icon(
-                                onPressed: _addPhoneNumber,
+                                onPressed: _canAdd ? _addPhoneNumber : null,
                                 icon: const Icon(Icons.add),
                                 label: const Text('Add'),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Theme.of(
-                                    context,
-                                  ).colorScheme.primary,
-                                  foregroundColor: Theme.of(
-                                    context,
-                                  ).colorScheme.onPrimary,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 20,
                                     vertical: 16,
@@ -236,43 +252,63 @@ class _PhoneNumbersScreenState extends State<PhoneNumbersScreen> {
                                     itemCount: _phoneNumbers.length,
                                     itemBuilder: (context, index) {
                                       final phoneNumber = _phoneNumbers[index];
-                                      return Container(
-                                        margin: const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: 4,
-                                        ),
-                                        child: Card(
-                                          elevation: 2,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
+                                      return Dismissible(
+                                        key: ValueKey('pn_$phoneNumber'),
+                                        direction: DismissDirection.endToStart,
+                                        background: Container(
+                                          alignment: Alignment.centerRight,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 24,
                                           ),
-                                          child: ListTile(
-                                            leading: CircleAvatar(
-                                              backgroundColor: Theme.of(
-                                                context,
-                                              ).colorScheme.primaryContainer,
-                                              child: Icon(
-                                                Icons.phone,
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .onPrimaryContainer,
-                                              ),
+                                          color: Colors.red.withValues(
+                                            alpha: 0.1,
+                                          ),
+                                          child: const Icon(
+                                            Icons.delete,
+                                            color: Colors.red,
+                                          ),
+                                        ),
+                                        onDismissed: (_) {
+                                          _removePhoneNumber(phoneNumber);
+                                          _showSnackBar('Removed $phoneNumber');
+                                        },
+                                        child: Container(
+                                          margin: const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 4,
+                                          ),
+                                          child: Card(
+                                            elevation: 2,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
                                             ),
-                                            title: Text(
-                                              phoneNumber,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w500,
+                                            child: ListTile(
+                                              leading: CircleAvatar(
+                                                backgroundColor: Theme.of(
+                                                  context,
+                                                ).colorScheme.primaryContainer,
+                                                child: Icon(
+                                                  Icons.phone,
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .onPrimaryContainer,
+                                                ),
                                               ),
-                                            ),
-                                            trailing: IconButton(
-                                              icon: const Icon(Icons.delete),
-                                              color: Colors.red,
-                                              onPressed: () =>
-                                                  _showDeleteDialog(
-                                                    phoneNumber,
-                                                  ),
+                                              title: Text(
+                                                phoneNumber,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                              trailing: IconButton(
+                                                icon: const Icon(Icons.delete),
+                                                color: Colors.red,
+                                                onPressed: () =>
+                                                    _showDeleteDialog(
+                                                      phoneNumber,
+                                                    ),
+                                              ),
                                             ),
                                           ),
                                         ),

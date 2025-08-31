@@ -18,6 +18,7 @@ class _LogsScreenState extends State<LogsScreen> {
   bool _isLoading = true;
   final List<String> _logLevels = ['ALL', 'DEBUG', 'INFO', 'WARNING', 'ERROR'];
   List<String> _availableTags = ['ALL'];
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -69,6 +70,18 @@ class _LogsScreenState extends State<LogsScreen> {
     if (_selectedTag != 'ALL') {
       filteredLogs = filteredLogs
           .where((log) => log.tag == _selectedTag)
+          .toList();
+    }
+
+    // Text search filter
+    if (_searchQuery.trim().isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      filteredLogs = filteredLogs
+          .where(
+            (log) =>
+                log.message.toLowerCase().contains(q) ||
+                log.tag.toLowerCase().contains(q),
+          )
           .toList();
     }
 
@@ -314,72 +327,95 @@ class _LogsScreenState extends State<LogsScreen> {
             decoration: BoxDecoration(
               color: Theme.of(
                 context,
-              ).colorScheme.surfaceVariant.withOpacity(0.3),
+              ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
               border: Border(
                 bottom: BorderSide(
-                  color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outline.withValues(alpha: 0.2),
                 ),
               ),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _selectedLevel,
-                    decoration: const InputDecoration(
-                      labelText: 'Level',
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                    ),
-                    items: _logLevels.map((level) {
-                      return DropdownMenuItem(
-                        value: level,
-                        child: Row(
-                          children: [
-                            if (level != 'ALL') ...[
-                              Icon(
-                                _getLogLevelIcon(level),
-                                size: 16,
-                                color: _getLogLevelColor(level),
-                              ),
-                              const SizedBox(width: 8),
-                            ],
-                            Text(level),
-                          ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _selectedLevel,
+                        decoration: const InputDecoration(
+                          labelText: 'Level',
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                         ),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedLevel = value!;
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _selectedTag,
-                    decoration: const InputDecoration(
-                      labelText: 'Tag',
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
+                        items: _logLevels.map((level) {
+                          return DropdownMenuItem(
+                            value: level,
+                            child: Row(
+                              children: [
+                                if (level != 'ALL') ...[
+                                  Icon(
+                                    _getLogLevelIcon(level),
+                                    size: 16,
+                                    color: _getLogLevelColor(level),
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
+                                Text(level),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedLevel = value!;
+                          });
+                        },
                       ),
                     ),
-                    items: _availableTags.map((tag) {
-                      return DropdownMenuItem(value: tag, child: Text(tag));
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedTag = value!;
-                      });
-                    },
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _selectedTag,
+                        decoration: const InputDecoration(
+                          labelText: 'Tag',
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                        ),
+                        items: _availableTags.map((tag) {
+                          return DropdownMenuItem(value: tag, child: Text(tag));
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedTag = value!;
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Search logs...',
+                    isDense: true,
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                  },
                 ),
               ],
             ),
@@ -423,9 +459,10 @@ class _LogsScreenState extends State<LogsScreen> {
                                     Icon(
                                       Icons.article_outlined,
                                       size: 64,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurface.withOpacity(0.3),
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withValues(alpha: 0.3),
                                     ),
                                     const SizedBox(height: 16),
                                     Text(
@@ -438,7 +475,7 @@ class _LogsScreenState extends State<LogsScreen> {
                                             color: Theme.of(context)
                                                 .colorScheme
                                                 .onSurface
-                                                .withOpacity(0.6),
+                                                .withValues(alpha: 0.6),
                                           ),
                                     ),
                                     const SizedBox(height: 8),
@@ -452,7 +489,7 @@ class _LogsScreenState extends State<LogsScreen> {
                                             color: Theme.of(context)
                                                 .colorScheme
                                                 .onSurface
-                                                .withOpacity(0.5),
+                                                .withValues(alpha: 0.5),
                                           ),
                                     ),
                                   ],
@@ -501,12 +538,14 @@ class _LogsScreenState extends State<LogsScreen> {
                                                     vertical: 2,
                                                   ),
                                               decoration: BoxDecoration(
-                                                color: accent.withOpacity(0.1),
+                                                color: accent.withValues(
+                                                  alpha: 0.1,
+                                                ),
                                                 borderRadius:
                                                     BorderRadius.circular(8),
                                                 border: Border.all(
-                                                  color: accent.withOpacity(
-                                                    0.3,
+                                                  color: accent.withValues(
+                                                    alpha: 0.3,
                                                   ),
                                                 ),
                                               ),
@@ -559,7 +598,7 @@ class _LogsScreenState extends State<LogsScreen> {
                                                 color: Theme.of(context)
                                                     .colorScheme
                                                     .onSurface
-                                                    .withOpacity(0.6),
+                                                    .withValues(alpha: 0.6),
                                               ),
                                         ),
                                       ],
