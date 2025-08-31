@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:sms_to_api/storage/settings/api_endpoint.dart';
 import 'package:sms_to_api/storage/settings/storage.dart';
 import 'package:sms_to_api/storage/settings/type.dart';
+import 'package:sms_to_api/service/api_service.dart';
 
 class ApiEndpointsScreen extends StatefulWidget {
   const ApiEndpointsScreen({super.key});
@@ -14,7 +15,8 @@ class _ApiEndpointsScreenState extends State<ApiEndpointsScreen> {
   final Storage _storage = Storage();
   bool _isLoading = true;
   List<ApiEndpoint> _endpoints = [];
-  String _authHeaderName = 'Authorization';
+  final Map<String, bool?> _validationStatus = {}; // endpointId -> last result
+  final Set<String> _validating = <String>{};
 
   @override
   void initState() {
@@ -26,7 +28,6 @@ class _ApiEndpointsScreenState extends State<ApiEndpointsScreen> {
     final s = await _storage.load();
     setState(() {
       _endpoints = List.of(s?.endpoints ?? []);
-      _authHeaderName = s?.authHeaderName ?? 'Authorization';
       _isLoading = false;
     });
   }
@@ -37,7 +38,7 @@ class _ApiEndpointsScreenState extends State<ApiEndpointsScreen> {
       url: existing?.url ?? '',
       apiKey: existing?.apiKey ?? '',
       endpoints: _endpoints,
-      authHeaderName: existing?.authHeaderName ?? _authHeaderName,
+      authHeaderName: existing?.authHeaderName ?? 'Authorization',
       phoneNumbers: existing?.phoneNumbers ?? const [],
     );
     await _storage.save(updated);
@@ -68,6 +69,8 @@ class _ApiEndpointsScreenState extends State<ApiEndpointsScreen> {
     final nameCtrl = TextEditingController(text: initial?.name ?? '');
     final urlCtrl = TextEditingController(text: initial?.url ?? '');
     final keyCtrl = TextEditingController(text: initial?.apiKey ?? '');
+    final headerCtrl =
+        TextEditingController(text: initial?.authHeaderName ?? 'Authorization');
     bool obscured = true;
     final formKey = GlobalKey<FormState>();
 
@@ -108,6 +111,17 @@ class _ApiEndpointsScreenState extends State<ApiEndpointsScreen> {
                   },
                 ),
                 const SizedBox(height: 12),
+                TextFormField(
+                  controller: headerCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Auth Header Name',
+                    prefixIcon: Icon(Icons.security),
+                    helperText: 'Header to carry the API key',
+                  ),
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? 'Enter header name' : null,
+                ),
+                const SizedBox(height: 12),
                 StatefulBuilder(
                   builder: (context, setSBState) => TextFormField(
                     controller: keyCtrl,
@@ -121,7 +135,7 @@ class _ApiEndpointsScreenState extends State<ApiEndpointsScreen> {
                           obscured ? Icons.visibility_off : Icons.visibility,
                         ),
                       ),
-                      helperText: 'Header: $_authHeaderName',
+                      helperText: 'Kept secure locally',
                     ),
                     validator: (v) => (v == null || v.trim().isEmpty)
                         ? 'Enter API key'
@@ -148,6 +162,7 @@ class _ApiEndpointsScreenState extends State<ApiEndpointsScreen> {
                 name: nameCtrl.text.trim(),
                 url: urlCtrl.text.trim(),
                 apiKey: keyCtrl.text.trim(),
+                authHeaderName: headerCtrl.text.trim(),
                 active: initial?.active ?? true,
               );
               setState(() {
@@ -157,9 +172,11 @@ class _ApiEndpointsScreenState extends State<ApiEndpointsScreen> {
                 } else {
                   _endpoints.add(updated);
                 }
+                _validationStatus[nowId] = null; // reset status after edit
               });
               await _save();
-              if (mounted) Navigator.of(ctx).pop();
+              if (!ctx.mounted) return;
+              Navigator.of(ctx).pop();
             },
             child: Text(initial == null ? 'Add' : 'Save'),
           ),
@@ -168,11 +185,36 @@ class _ApiEndpointsScreenState extends State<ApiEndpointsScreen> {
     );
   }
 
+  Future<void> _validate(ApiEndpoint ep) async {
+    setState(() {
+      _validating.add(ep.id);
+    });
+    final settings = await _storage.load();
+    final api = ApiService();
+    final ok = await api.validateEndpoint(
+      ep,
+      fallbackHeaderName: settings?.authHeaderName,
+    );
+    if (!mounted) return;
+    setState(() {
+      _validationStatus[ep.id] = ok;
+      _validating.remove(ep.id);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok ? 'Validated ${ep.name}' : 'Validation failed for ${ep.name}',
+        ),
+        backgroundColor: ok ? Colors.green : Colors.red,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('API Endpoints'),
+        title: const Text('Profiles'),
         elevation: 0,
         backgroundColor: Theme.of(context).colorScheme.surface,
         foregroundColor: Theme.of(context).colorScheme.onSurface,
@@ -185,21 +227,6 @@ class _ApiEndpointsScreenState extends State<ApiEndpointsScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.security),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Auth Header: $_authHeaderName',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
                 Expanded(
                   child: _endpoints.isEmpty
                       ? Center(
@@ -229,14 +256,49 @@ class _ApiEndpointsScreenState extends State<ApiEndpointsScreen> {
                               onDismissed: (_) => _remove(ep),
                               child: ListTile(
                                 title: Text(ep.name),
-                                subtitle: Text(ep.url),
+                                subtitle: Text(
+                                  '${ep.url}\nHeader: ${ep.authHeaderName}',
+                                  maxLines: 2,
+                                ),
                                 leading: Switch(
                                   value: ep.active,
                                   onChanged: (v) => _toggleActive(ep, v),
                                 ),
-                                trailing: IconButton(
-                                  icon: const Icon(Icons.edit),
-                                  onPressed: () => _upsertDialog(initial: ep),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (_validating.contains(ep.id))
+                                      const SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    else ...[
+                                      Icon(
+                                        _validationStatus[ep.id] == true
+                                            ? Icons.cloud_done
+                                            : _validationStatus[ep.id] == false
+                                                ? Icons.cloud_off
+                                                : Icons.help_outline,
+                                        color: _validationStatus[ep.id] == true
+                                            ? Colors.green
+                                            : _validationStatus[ep.id] == false
+                                                ? Colors.red
+                                                : Colors.grey,
+                                      ),
+                                      IconButton(
+                                        tooltip: 'Validate',
+                                        icon: const Icon(Icons.check_circle),
+                                        onPressed: () => _validate(ep),
+                                      ),
+                                    ],
+                                    IconButton(
+                                      icon: const Icon(Icons.edit),
+                                      onPressed: () => _upsertDialog(initial: ep),
+                                    ),
+                                  ],
                                 ),
                               ),
                             );

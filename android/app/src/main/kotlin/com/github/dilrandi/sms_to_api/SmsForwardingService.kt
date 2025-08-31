@@ -18,7 +18,8 @@ data class Endpoint(
         val name: String,
         val url: String,
         val apiKey: String,
-        val active: Boolean
+        val active: Boolean,
+        val authHeaderName: String = "Authorization"
 )
 
 data class AppSettings(
@@ -186,7 +187,8 @@ class SmsForwardingService : Service() {
                                         name = "Default",
                                         url = settings.url!!,
                                         apiKey = settings.apiKey!!,
-                                        active = true
+                                        active = true,
+                                        authHeaderName = settings.authHeaderName
                                 )
                         )
                 else emptyList()
@@ -240,10 +242,10 @@ class SmsForwardingService : Service() {
                                         apiUrl.openConnection() as java.net.HttpURLConnection
                                 connection.requestMethod = "POST"
                                 connection.setRequestProperty("Content-Type", "application/json")
-                                connection.setRequestProperty(
-                                        settings.authHeaderName,
-                                        endpoint.apiKey
-                                )
+                                val headerName =
+                                        if (endpoint.authHeaderName.isNotEmpty()) endpoint.authHeaderName
+                                        else settings.authHeaderName
+                                connection.setRequestProperty(headerName, endpoint.apiKey)
                                 connection.doOutput = true
                                 connection.connectTimeout = 10000
                                 connection.readTimeout = 10000
@@ -346,8 +348,9 @@ class SmsForwardingService : Service() {
                         val epUrl = o.optString("url", "")
                         val epKey = o.optString("apiKey", "")
                         val active = o.optBoolean("active", true)
+                        val header = o.optString("authHeaderName", "Authorization")
                         if (epUrl.isNotEmpty() && epKey.isNotEmpty()) {
-                            endpoints.add(Endpoint(id, name, epUrl, epKey, active))
+                            endpoints.add(Endpoint(id, name, epUrl, epKey, active, header))
                         }
                     }
                 }

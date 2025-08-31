@@ -3,6 +3,8 @@ class ApiEndpoint {
   final String name;
   final String url;
   final String apiKey;
+  // Header name specific to this endpoint (profile)
+  final String authHeaderName;
   final bool active;
 
   const ApiEndpoint({
@@ -10,6 +12,7 @@ class ApiEndpoint {
     required this.name,
     required this.url,
     required this.apiKey,
+    this.authHeaderName = 'Authorization',
     this.active = true,
   });
 
@@ -18,6 +21,7 @@ class ApiEndpoint {
     String? name,
     String? url,
     String? apiKey,
+    String? authHeaderName,
     bool? active,
   }) {
     return ApiEndpoint(
@@ -25,6 +29,7 @@ class ApiEndpoint {
       name: name ?? this.name,
       url: url ?? this.url,
       apiKey: apiKey ?? this.apiKey,
+      authHeaderName: authHeaderName ?? this.authHeaderName,
       active: active ?? this.active,
     );
   }
@@ -34,6 +39,7 @@ class ApiEndpoint {
     'name': name,
     'url': url,
     'apiKey': apiKey,
+    'authHeaderName': authHeaderName,
     'active': active,
   };
 
@@ -45,6 +51,7 @@ class ApiEndpoint {
       name: json['name']?.toString() ?? 'Endpoint',
       url: json['url']?.toString() ?? '',
       apiKey: json['apiKey']?.toString() ?? '',
+      authHeaderName: json['authHeaderName']?.toString() ?? 'Authorization',
       active: json['active'] is bool
           ? (json['active'] as bool)
           : json['active']?.toString().toLowerCase() == 'true',

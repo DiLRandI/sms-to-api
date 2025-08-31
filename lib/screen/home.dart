@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sms_to_api/screen/logs.dart';
 import 'package:sms_to_api/screen/phone_numbers.dart';
-import 'package:sms_to_api/screen/settings.dart';
 import 'package:sms_to_api/service/api_service.dart';
 import 'package:sms_to_api/storage/settings/storage.dart';
 import 'package:sms_to_api/screen/api_endpoints.dart';
@@ -576,7 +575,7 @@ class _MyHomePageState extends State<MyHomePage> {
               );
               _checkSettings();
             },
-            tooltip: 'API Endpoints',
+            tooltip: 'Profiles',
           ),
           const SizedBox(width: 8),
           IconButton(
@@ -590,18 +589,6 @@ class _MyHomePageState extends State<MyHomePage> {
             tooltip: 'View Logs',
           ),
           const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(Icons.settings_rounded),
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SettingsScreen()),
-              );
-              // Refresh the validation status when returning from settings
-              _checkSettings();
-            },
-            tooltip: 'Settings',
-          ),
           const SizedBox(width: 16),
         ],
       ),
