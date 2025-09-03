@@ -94,10 +94,10 @@ class SmsForwardingService : Service() {
 
         // Check if the intent is from SMSReceiver to forward SMS
         if (intent?.action == ACTION_FORWARD_SMS_TO_API) {
-            val smsSender = intent?.getStringExtra("sms_sender")
-            val smsBody = intent?.getStringExtra("sms_body")
-            val smsPartsCount = intent?.getIntExtra("sms_parts_count", 1) ?: 1
-            val autoStop = intent?.getBooleanExtra("auto_stop", false) ?: false
+            val smsSender = intent.getStringExtra("sms_sender")
+            val smsBody = intent.getStringExtra("sms_body")
+            val smsPartsCount = intent.getIntExtra("sms_parts_count", 1)
+            val autoStop = intent.getBooleanExtra("auto_stop", false)
 
             // Truncate body in logs for readability/privacy; keep full body for API payload
             val safeBody = (smsBody ?: "").let { if (it.length > 160) it.take(160) + "…" else it }
@@ -109,8 +109,15 @@ class SmsForwardingService : Service() {
             } else {
                 logManager.logInfo(TAG, "Received SMS from $smsSender with body: $safeBody")
             }
-            // Send SMS data to API(s)
-            sendToApi(smsSender, smsBody, smsPartsCount, autoStop, startId)
+            // Send SMS data to API(s); if no work is started, stop early to avoid lingering service
+            val workStarted = sendToApi(smsSender, smsBody, smsPartsCount, autoStop, startId)
+            if (!workStarted && autoStop && boundClients == 0) {
+                logManager.logDebug(TAG, "No work started; stopping service early (startId=$startId)")
+                try {
+                    stopSelf(startId)
+                } catch (_: Exception) {}
+                return START_NOT_STICKY
+            }
         }
 
         // Build the notification for the foreground service
@@ -169,10 +176,10 @@ class SmsForwardingService : Service() {
             smsPartsCount: Int = 1,
             autoStopWhenDone: Boolean = false,
             serviceStartId: Int = 0
-    ) {
+    ): Boolean {
         if (smsSender == null || smsBody == null) {
             logManager.logWarning(TAG, "SMS sender or body is null, skipping API call")
-            return
+            return false
         }
 
         val settings = getStoredSettings()
@@ -195,7 +202,7 @@ class SmsForwardingService : Service() {
 
         if (activeEndpoints.isEmpty()) {
             logManager.logWarning(TAG, "No active API endpoints configured, skipping API call")
-            return
+            return false
         }
 
         // Check if phone numbers are configured and if sender matches any of them
@@ -213,7 +220,7 @@ class SmsForwardingService : Service() {
                         TAG,
                         "SMS sender '$smsSender' does not match any configured phone numbers: ${settings.phoneNumbers}. Skipping API call"
                 )
-                return
+                return false
             }
 
             logManager.logInfo(
@@ -308,6 +315,7 @@ class SmsForwardingService : Service() {
                     }
                 }
                 .start()
+        return true
     }
 
     private fun getStoredSettings(): AppSettings {
