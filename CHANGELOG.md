@@ -3,7 +3,18 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
-- Add tests or samples for early-stop logic (planned)
+### Added
+- Secure settings bridge using encrypted storage with automatic legacy migration.
+- Structured Kotlin coroutine dispatcher for foreground service network work.
+- Test coverage for storage migration, API header fallbacks, and log sanitization.
+
+### Changed
+- Foreground service now returns `START_NOT_STICKY` and stops from the main thread once work completes.
+- Flutter UI guards asynchronous `setState` calls with `mounted` checks and detaches native listeners on dispose.
+- Android activity surfaces SMS permission rationale, default-SMS guidance, and shared method channels for secure storage.
+
+### Docs
+- Updated README/AGENTS to describe secure storage, sender allow-lists, default SMS requirement, and new test locations.
 
 ## [1.1.0] - 2025-09-03
 ### Fixed
@@ -17,4 +28,3 @@ All notable changes to this project will be documented in this file.
 
 ### Notes
 - Consider adding a pre-check in `SmsReceiver` to skip starting the service when the sender is known to be disallowed (optimization).
-

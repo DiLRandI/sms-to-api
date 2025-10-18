@@ -7,7 +7,7 @@ Forward SMS messages to a REST API using Flutter.
 
 ## Overview
 
-`sms_to_api` is a Flutter application that listens for incoming SMS messages and forwards them to a configurable REST API endpoint. The app allows you to set the API URL and API key in the settings screen, and stores these securely using `shared_preferences`.
+`sms_to_api` is a Flutter application that listens for incoming SMS messages and forwards them to configurable REST API endpoints. Settings are saved through a Flutter↔︎Kotlin method channel and encrypted on-device via Android's `EncryptedSharedPreferences`, falling back to legacy storage only when secure storage is unavailable (e.g., during tests).
 
 ## Architecture
 
@@ -29,12 +29,13 @@ architecture-beta
 
 ## Features
 
-- Configure REST API endpoint and API key
+- Configure multiple REST API endpoints with individual auth headers
 - Validate API connectivity (manual validation with feedback)
-- Store settings securely
+- Store settings securely using encrypted preferences with automatic legacy migration
 - Forward SMS messages to the API
 - Start/stop/bind/unbind Android foreground service
 - View service status and logs
+- Restrict forwarding to an allow-list of senders
 
 ## Getting Started
 
@@ -76,15 +77,19 @@ architecture-beta
 
 ## Configuration
 
-Go to the **Settings** screen in the app to set your API URL and API key. Optionally configure allowed phone numbers; when set, only messages from these senders are forwarded. If none are set, all SMS will be forwarded.
+Use the home screen shortcuts to configure profiles and sender allow-lists:
+
+- **Profiles** → add one or more API endpoints with friendly names, URLs, keys, and per-endpoint auth headers.
+- **Phone Numbers** → optionally limit forwarding to specific numbers or short codes; when empty, all SMS will be forwarded.
+- **Validate APIs** from the home screen to ensure at least one active endpoint responds with HTTP 200 prior to enabling the Android service.
 
 ## Project Structure
 
 - `lib/main.dart`: App entry point
 - `lib/screen/home.dart`: Home screen and main logic
-- `lib/screen/settings.dart`: Settings screen for API configuration
+- `lib/screen/api_endpoints.dart`: Manage endpoint profiles
 - `lib/screen/logs.dart`: Logs screen for viewing forwarded SMS logs
-- `lib/screen/phone_numbers.dart`: Manage allowed/blocked phone numbers
+- `lib/screen/phone_numbers.dart`: Manage allowed sender phone numbers/short codes
 - `lib/service/api_service.dart`: API service for sending SMS data
 - `lib/service/log_service.dart`: Service for managing and storing logs
 - `lib/storage/settings/`: Settings storage and type definitions
@@ -94,8 +99,10 @@ Go to the **Settings** screen in the app to set your API URL and API key. Option
 
 - `flutter`: Flutter SDK
 - `cupertino_icons`: iOS-style icons
-- `shared_preferences`: Local storage for settings
+- `shared_preferences`: legacy/local storage fallback
 - `http`: HTTP requests
+- `androidx.security:security-crypto`: Android encrypted preferences (native)
+- `kotlinx-coroutines-android`: Native service background work (native)
 - (and any other dependencies listed in `pubspec.yaml`)
 
 ## Coding Style
@@ -109,6 +116,7 @@ Go to the **Settings** screen in the app to set your API URL and API key. Option
 
 - Framework: `flutter_test` with `WidgetTester`.
 - Tests live under `test/` and end with `_test.dart`.
+- Core unit tests live in `test/service` and `test/storage`; widget smoke tests stay in `test/widget_test.dart`.
 - Run: `flutter test` (fast, deterministic tests preferred).
 - Coverage: `flutter test --coverage` (outputs `coverage/lcov.info`).
 
@@ -117,12 +125,13 @@ Go to the **Settings** screen in the app to set your API URL and API key. Option
 - Requires SMS permissions and a foreground service to receive messages reliably.
 - Validate on a real device for background delivery and service behavior.
 - Service early-stop: when an incoming SMS does not match configured phone numbers (or no endpoints are active), the service stops immediately and does not remain in the foreground.
-- Ensure app is exempt from battery optimizations if necessary.
+- The app must be the **default SMS handler** on Android 11+ to receive broadcasted SMS messages. The home activity now prompts to switch if necessary.
+- Foreground work runs on structured Kotlin coroutines and the service returns `START_NOT_STICKY` to comply with modern Android background limits. Keep an eye on OEM-specific battery optimizations.
 
 ## Security
 
-- Do not commit secrets. Configure API URL and API key in the app Settings.
-- Settings are stored via `shared_preferences` on device.
+- Do not commit secrets. Configure API URLs and keys inside the app.
+- Settings are stored using encrypted preferences on Android with automatic redaction in logs/snackbars.
 - Validate API connectivity using the in‑app validation before release testing.
 
 ## Contributing
