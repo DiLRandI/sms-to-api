@@ -23,6 +23,8 @@ class MainActivity : FlutterActivity() {
     private val settingsChannelName = "com.github.dilrandi.sms_to_api/settings"
     private lateinit var serviceChannel: MethodChannel
     private lateinit var settingsChannel: MethodChannel
+    private val prefsName = "sms_to_api_prefs"
+    private val defaultPromptKey = "default_sms_prompt_shown"
 
     private var smsForwardingService: SmsForwardingService? = null
     private var isBound = false // To track if the activity is bound to the service
@@ -103,7 +105,7 @@ class MainActivity : FlutterActivity() {
                         isBound = false
                         smsForwardingService = null
                         result.success("Unbound")
-                        channel.invokeMethod("onServiceStatusChanged", "Running & Unbound") // Service is still running in foreground
+                        serviceChannel.invokeMethod("onServiceStatusChanged", "Running & Unbound") // Service is still running in foreground
                     } else {
                         result.success("Not Bound")
                     }
@@ -214,21 +216,33 @@ class MainActivity : FlutterActivity() {
     private fun ensureDefaultSmsApp() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             val defaultPackage = Telephony.Sms.getDefaultSmsPackage(this)
-            if (defaultPackage != packageName) {
-                AlertDialog.Builder(this)
-                        .setTitle("Set default SMS app")
-                        .setMessage("To read SMS reliably, set SMS TO API as the default SMS application.")
-                        .setPositiveButton(android.R.string.ok) { _, _ ->
-                            val intent = Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT)
-                            intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName)
-                            startActivity(intent)
-                        }
-                        .setNegativeButton(android.R.string.cancel, null)
-                        .show()
+            val prefs = getSharedPreferences(prefsName, Context.MODE_PRIVATE)
+
+            if (defaultPackage == packageName) {
+                // We are already default; allow future prompts if user switches away later.
+                prefs.edit().remove(defaultPromptKey).apply()
+                return
+            }
+
+            if (prefs.getBoolean(defaultPromptKey, false)) {
+                return
+            }
+
+            prefs.edit().putBoolean(defaultPromptKey, true).apply()
+
+            AlertDialog.Builder(this)
+                    .setTitle("Set default SMS app")
+                    .setMessage("To read SMS reliably, set SMS TO API as the default SMS application.")
+                    .setPositiveButton(android.R.string.ok) { _, _ ->
+                        val intent = Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT)
+                        intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName)
+                        startActivity(intent)
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
             }
         }
     }
-
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
@@ -270,7 +284,6 @@ class MainActivity : FlutterActivity() {
             }
         }
     }
-
     override fun onDestroy() {
         super.onDestroy()
         // Ensure the service is unbound when the activity is destroyed to prevent leaks
