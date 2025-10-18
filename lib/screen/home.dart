@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sms_to_api/screen/logs.dart';
 import 'package:sms_to_api/screen/phone_numbers.dart';
-import 'package:sms_to_api/screen/settings.dart';
 import 'package:sms_to_api/service/api_service.dart';
 import 'package:sms_to_api/storage/settings/storage.dart';
+import 'package:sms_to_api/screen/api_endpoints.dart';
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
@@ -29,9 +29,7 @@ class _MyHomePageState extends State<MyHomePage> {
     // Check if settings are configured (without API validation)
     final settings = await _storage.load();
     final settingsConfigured =
-        settings != null &&
-        settings.url.isNotEmpty &&
-        settings.apiKey.isNotEmpty;
+        settings != null && settings.endpoints.isNotEmpty;
 
     setState(() {
       _isSettingsConfigured = settingsConfigured;
@@ -332,19 +330,19 @@ class _MyHomePageState extends State<MyHomePage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'API Endpoint Status',
+                            'API Endpoints Status',
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             _isCheckingApi
-                                ? 'Checking endpoint connectivity...'
+                                ? 'Checking endpoints connectivity...'
                                 : _hasValidatedApi
                                 ? (_isApiReachable
-                                      ? 'API endpoint is reachable and responding'
-                                      : 'API endpoint is not reachable')
-                                : 'Click "Validate API" to check endpoint connectivity',
+                                      ? 'At least one active endpoint is reachable'
+                                      : 'No active endpoint responded 200')
+                                : 'Click "Validate API" to check connectivity',
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(
                                   color: _isCheckingApi
@@ -498,7 +496,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   child: ElevatedButton.icon(
                     onPressed: _validateApi,
                     icon: const Icon(Icons.check_circle),
-                    label: const Text('Validate API'),
+                    label: const Text('Validate APIs'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
@@ -514,7 +512,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   child: ElevatedButton.icon(
                     onPressed: _testApiCall,
                     icon: const Icon(Icons.send),
-                    label: const Text('Test API'),
+                    label: const Text('Test APIs'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.orange,
                       foregroundColor: Colors.white,
@@ -567,6 +565,20 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
           const SizedBox(width: 8),
           IconButton(
+            icon: const Icon(Icons.cloud_queue),
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ApiEndpointsScreen(),
+                ),
+              );
+              _checkSettings();
+            },
+            tooltip: 'Profiles',
+          ),
+          const SizedBox(width: 8),
+          IconButton(
             icon: const Icon(Icons.list_alt),
             onPressed: () async {
               await Navigator.push(
@@ -577,18 +589,6 @@ class _MyHomePageState extends State<MyHomePage> {
             tooltip: 'View Logs',
           ),
           const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(Icons.settings_rounded),
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SettingsScreen()),
-              );
-              // Refresh the validation status when returning from settings
-              _checkSettings();
-            },
-            tooltip: 'Settings',
-          ),
           const SizedBox(width: 16),
         ],
       ),

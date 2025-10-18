@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:http/http.dart' as http;
 import 'package:sms_to_api/storage/settings/storage.dart';
+import 'package:sms_to_api/storage/settings/api_endpoint.dart';
 
 class SMSMessage {
   final String message;
@@ -30,43 +31,52 @@ class ApiService {
   ApiService() : _storage = Storage();
 
   Future<bool> validateApi() async {
-    var settings = await _storage.load();
-    if (settings == null) {
-      return false;
-    }
+    final settings = await _storage.load();
+    if (settings == null) return false;
 
-    if (settings.url.isEmpty || settings.apiKey.isEmpty) {
-      return false;
-    }
+    final activeEndpoints = settings.endpoints.where((e) => e.active).toList();
+    if (activeEndpoints.isEmpty) return false;
 
-    // Basic URL validation: must be a valid http/https URL
-    final uri = Uri.tryParse(settings.url);
+    // Consider configuration reachable if at least one active endpoint responds with 200
+    for (final endpoint in activeEndpoints) {
+      final ok = await validateEndpoint(
+        endpoint,
+        fallbackHeaderName: settings.authHeaderName,
+      );
+      if (ok) return true;
+    }
+    return false;
+  }
+
+  Future<bool> validateEndpoint(
+    ApiEndpoint endpoint, {
+    String? fallbackHeaderName,
+  }) async {
+    final uri = Uri.tryParse(endpoint.url);
     if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
       return false;
     }
-
+    final headerName = (endpoint.authHeaderName.isNotEmpty
+            ? endpoint.authHeaderName
+            : null) ??
+        (fallbackHeaderName?.isNotEmpty == true
+            ? fallbackHeaderName!
+            : 'Authorization');
     try {
       final response = await http
           .post(
             uri,
             headers: {
               'Content-Type': 'application/json',
-              settings.authHeaderName: settings.apiKey,
+              headerName: endpoint.apiKey,
             },
-            body: jsonEncode({'test': true}),
+            body: jsonEncode({'test': true, 'endpoint': endpoint.name}),
           )
           .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode != 200) {
-        return false;
-      }
+      return response.statusCode == 200;
     } catch (e) {
-      // Avoid printing secrets; provide concise diagnostic info.
-      // ignore: avoid_print
-      debugPrint('Error validating API endpoint: $e');
+      debugPrint('Error validating ${endpoint.name}: $e');
       return false;
     }
-
-    return true;
   }
 }

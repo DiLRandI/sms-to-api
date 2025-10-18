@@ -76,7 +76,7 @@ architecture-beta
 
 ## Configuration
 
-Go to the **Settings** screen in the app to set your API URL and API key. These are required for the app to forward SMS messages.
+Go to the **Settings** screen in the app to set your API URL and API key. Optionally configure allowed phone numbers; when set, only messages from these senders are forwarded. If none are set, all SMS will be forwarded.
 
 ## Project Structure
 
@@ -116,6 +116,7 @@ Go to the **Settings** screen in the app to set your API URL and API key. These 
 
 - Requires SMS permissions and a foreground service to receive messages reliably.
 - Validate on a real device for background delivery and service behavior.
+- Service early-stop: when an incoming SMS does not match configured phone numbers (or no endpoints are active), the service stops immediately and does not remain in the foreground.
 - Ensure app is exempt from battery optimizations if necessary.
 
 ## Security
