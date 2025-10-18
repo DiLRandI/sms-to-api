@@ -62,9 +62,9 @@ class LogManager(private val context: Context) {
                         put("timestamp", dateFormat.format(Date()))
                         put("level", level)
                         put("tag", tag)
-                        put("message", message)
+                        put("message", sanitize(message))
                         if (stackTrace != null) {
-                            put("stackTrace", stackTrace)
+                            put("stackTrace", sanitize(stackTrace))
                         }
                     }
 
@@ -86,5 +86,20 @@ class LogManager(private val context: Context) {
     private fun generateId(): String {
         val chars = "abcdefghijklmnopqrstuvwxyz0123456789"
         return (1..8).map { chars.random() }.joinToString("")
+    }
+
+    private fun sanitize(message: String): String {
+        val patterns = listOf(
+                Regex("(?i)(api[_-]?key\\s*[:=]\\s*)([^\\s,]+)"),
+                Regex("(?i)(authorization\\s*[:=]\\s*)(Bearer\\s+[^\\s,]+)")
+        )
+        var sanitized = message
+        patterns.forEach { pattern ->
+            sanitized = sanitized.replace(pattern) { match ->
+                val prefix = match.groups[1]?.value ?: ""
+                "$prefix***"
+            }
+        }
+        return sanitized
     }
 }

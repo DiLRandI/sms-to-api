@@ -84,8 +84,8 @@ class LogService {
       'timestamp': DateTime.now().toUtc().toIso8601String(),
       'level': level,
       'tag': tag,
-      'message': message,
-      if (stackTrace != null) 'stackTrace': stackTrace,
+      'message': _sanitize(message),
+      if (stackTrace != null) 'stackTrace': _sanitize(stackTrace),
     };
     logsList.add(entry);
 
@@ -101,6 +101,22 @@ class LogService {
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
     final t = DateTime.now().microsecondsSinceEpoch;
     return List.generate(8, (i) => chars[(t + i) % chars.length]).join();
+  }
+
+  String _sanitize(String input) {
+    var sanitized = input;
+    final patterns = <RegExp>[
+      RegExp(r'(api[_-]?key\s*[:=]\s*)([^\s,]+)', caseSensitive: false),
+      RegExp(r'(authorization\s*[:=]\s*)(Bearer\s+[^\s,]+)',
+          caseSensitive: false),
+    ];
+    for (final pattern in patterns) {
+      sanitized = sanitized.replaceAllMapped(pattern, (match) {
+        final prefix = match.group(1) ?? '';
+        return '$prefix***';
+      });
+    }
+    return sanitized;
   }
 
   Future<List<LogEntry>> getLogsByLevel(String level) async {

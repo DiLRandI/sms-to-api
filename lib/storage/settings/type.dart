@@ -18,6 +18,22 @@ class Settings {
     this.phoneNumbers = const [],
   });
 
+  Settings copyWith({
+    String? url,
+    String? apiKey,
+    List<ApiEndpoint>? endpoints,
+    String? authHeaderName,
+    List<String>? phoneNumbers,
+  }) {
+    return Settings(
+      url: url ?? this.url,
+      apiKey: apiKey ?? this.apiKey,
+      endpoints: endpoints ?? this.endpoints,
+      authHeaderName: authHeaderName ?? this.authHeaderName,
+      phoneNumbers: phoneNumbers ?? this.phoneNumbers,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       // Keep legacy fields to not break older native readers

@@ -26,6 +26,7 @@ class _ApiEndpointsScreenState extends State<ApiEndpointsScreen> {
 
   Future<void> _load() async {
     final s = await _storage.load();
+    if (!mounted) return;
     setState(() {
       _endpoints = List.of(s?.endpoints ?? []);
       _isLoading = false;

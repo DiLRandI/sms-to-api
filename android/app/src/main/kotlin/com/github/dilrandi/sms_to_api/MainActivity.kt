@@ -1,23 +1,28 @@
 package com.github.dilrandi.sms_to_api
 
 
+import android.Manifest
+import android.app.AlertDialog
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
+import android.provider.Telephony
 import android.util.Log
+import android.widget.Toast
+import androidx.core.app.ActivityCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
-import androidx.core.app.ActivityCompat
-import android.content.pm.PackageManager
-import android.Manifest
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.github.dilrandi.sms_to_api_service/sms_forwarding"
-    private lateinit var channel: MethodChannel
+    private val serviceChannelName = "com.github.dilrandi.sms_to_api_service/sms_forwarding"
+    private val settingsChannelName = "com.github.dilrandi.sms_to_api/settings"
+    private lateinit var serviceChannel: MethodChannel
+    private lateinit var settingsChannel: MethodChannel
 
     private var smsForwardingService: SmsForwardingService? = null
     private var isBound = false // To track if the activity is bound to the service
@@ -35,7 +40,7 @@ class MainActivity : FlutterActivity() {
             
             Log.d("MainActivity", "Service Bound: isBound=$isBound")
             // Inform Flutter about the status change
-            channel.invokeMethod("onServiceStatusChanged", "Running & Bound")
+            serviceChannel.invokeMethod("onServiceStatusChanged", "Running & Bound")
         }
 
         override fun onServiceDisconnected(arg0: ComponentName) {
@@ -43,15 +48,15 @@ class MainActivity : FlutterActivity() {
             smsForwardingService = null
             Log.d("MainActivity", "Service Disconnected: isBound=$isBound")
             // Inform Flutter about the status change
-            channel.invokeMethod("onServiceStatusChanged", "Running & Unbound")
+            serviceChannel.invokeMethod("onServiceStatusChanged", "Running & Unbound")
         }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        serviceChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, serviceChannelName)
         
-        channel.setMethodCallHandler { call, result ->
+        serviceChannel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "startSmsForwardingService" -> {
                     // Request notification permission before starting foreground service (Android 13+)
@@ -78,7 +83,7 @@ class MainActivity : FlutterActivity() {
                         isBound = false
                         smsForwardingService = null
                     }
-                    channel.invokeMethod("onServiceStatusChanged", "Stopped")
+                    serviceChannel.invokeMethod("onServiceStatusChanged", "Stopped")
                     result.success("Service stopped.")
                 }
                 "bindSmsForwardingService" -> {
@@ -114,6 +119,25 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        settingsChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, settingsChannelName)
+        settingsChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "saveSettings" -> {
+                    val payload = call.argument<String>("payload")
+                    if (payload.isNullOrEmpty()) {
+                        result.error("INVALID_PAYLOAD", "Settings payload is required", null)
+                    } else {
+                        SecureSettingsBridge.write(applicationContext, payload)
+                        result.success(true)
+                    }
+                }
+                "loadSettings" -> {
+                    result.success(SecureSettingsBridge.read(applicationContext))
+                }
+                else -> result.notImplemented()
+            }
+        }
     }
 
     private fun startSmsForwardingServiceInternal(result: MethodChannel.Result) {
@@ -130,7 +154,7 @@ class MainActivity : FlutterActivity() {
             bindService(intent, connection, Context.BIND_AUTO_CREATE)
         }
         
-        channel.invokeMethod("onServiceStatusChanged", "Running")
+        serviceChannel.invokeMethod("onServiceStatusChanged", "Running")
         result.success("Service started.")
     }
 
@@ -138,6 +162,7 @@ class MainActivity : FlutterActivity() {
         super.onResume()
         // Request SMS permissions when the activity resumes
         requestSmsPermissions()
+        ensureDefaultSmsApp()
     }
 
     private fun requestSmsPermissions() {
@@ -151,13 +176,55 @@ class MainActivity : FlutterActivity() {
             }
 
             if (permissionsToRequest.isNotEmpty()) {
-                ActivityCompat.requestPermissions(
-                    this,
-                    permissionsToRequest.toTypedArray(),
-                    SMS_PERMISSION_REQUEST_CODE
-                )
+                val permissionsArray = permissionsToRequest.toTypedArray()
+                val needsRationale = permissionsArray.any {
+                    ActivityCompat.shouldShowRequestPermissionRationale(this, it)
+                }
+
+                if (needsRationale) {
+                    showSmsPermissionRationale(permissionsArray)
+                } else {
+                    ActivityCompat.requestPermissions(
+                            this,
+                            permissionsArray,
+                            SMS_PERMISSION_REQUEST_CODE
+                    )
+                }
             } else {
                 Log.d("MainActivity", "SMS permissions already granted.")
+            }
+        }
+    }
+
+    private fun showSmsPermissionRationale(permissions: Array<String>) {
+        AlertDialog.Builder(this)
+                .setTitle("SMS access required")
+                .setMessage("SMS TO API needs SMS permissions to forward incoming messages to your configured endpoints.")
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    ActivityCompat.requestPermissions(
+                            this,
+                            permissions,
+                            SMS_PERMISSION_REQUEST_CODE
+                    )
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+    }
+
+    private fun ensureDefaultSmsApp() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            val defaultPackage = Telephony.Sms.getDefaultSmsPackage(this)
+            if (defaultPackage != packageName) {
+                AlertDialog.Builder(this)
+                        .setTitle("Set default SMS app")
+                        .setMessage("To read SMS reliably, set SMS TO API as the default SMS application.")
+                        .setPositiveButton(android.R.string.ok) { _, _ ->
+                            val intent = Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT)
+                            intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName)
+                            startActivity(intent)
+                        }
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .show()
             }
         }
     }
@@ -175,18 +242,18 @@ class MainActivity : FlutterActivity() {
                     // If permission granted, try starting the service again
                    startSmsForwardingServiceInternal(object : MethodChannel.Result {
                     override fun success(result: Any?) {
-                        channel.invokeMethod("onServiceStatusChanged", result as String)
+                        serviceChannel.invokeMethod("onServiceStatusChanged", result as String)
                     }
                     override fun error(errorCode: String, errorMessage: String?, errorDetails: Any?) {
-                        channel.invokeMethod("onServiceStatusChanged", "Error: $errorMessage")
+                        serviceChannel.invokeMethod("onServiceStatusChanged", "Error: $errorMessage")
                     }
                     override fun notImplemented() {
-                        channel.invokeMethod("onServiceStatusChanged", "Not Implemented")
+                        serviceChannel.invokeMethod("onServiceStatusChanged", "Not Implemented")
                     }
                 })
                 } else {
                     Log.w("MainActivity", "POST_NOTIFICATIONS permission denied.")
-                    channel.invokeMethod("onServiceStatusChanged", "Permission Denied, Service Not Started")
+                    serviceChannel.invokeMethod("onServiceStatusChanged", "Permission Denied, Service Not Started")
                 }
             }
             SMS_PERMISSION_REQUEST_CODE -> {
@@ -194,6 +261,11 @@ class MainActivity : FlutterActivity() {
                     Log.d("MainActivity", "SMS permissions granted.")
                 } else {
                     Log.w("MainActivity", "SMS permissions denied. SMS reception may not work.")
+                    Toast.makeText(
+                            this,
+                            "SMS permissions were denied. Incoming messages may not be forwarded.",
+                            Toast.LENGTH_LONG
+                    ).show()
                 }
             }
         }

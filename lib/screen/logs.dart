@@ -35,12 +35,14 @@ class _LogsScreenState extends State<LogsScreen> {
       final logs = await _logService.getAllLogs();
       final tags = _extractUniqueTags(logs);
 
+      if (!mounted) return;
       setState(() {
         _logs = logs;
         _availableTags = ['ALL', ...tags];
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });

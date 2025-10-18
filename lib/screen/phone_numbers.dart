@@ -32,11 +32,13 @@ class _PhoneNumbersScreenState extends State<PhoneNumbersScreen> {
   Future<void> _loadPhoneNumbers() async {
     try {
       final settings = await _storage.load();
+      if (!mounted) return;
       setState(() {
         _phoneNumbers = settings?.phoneNumbers ?? [];
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
@@ -90,6 +92,7 @@ class _PhoneNumbersScreenState extends State<PhoneNumbersScreen> {
   }
 
   void _showSnackBar(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),

@@ -31,6 +31,7 @@ class _MyHomePageState extends State<MyHomePage> {
     final settingsConfigured =
         settings != null && settings.endpoints.isNotEmpty;
 
+    if (!mounted) return;
     setState(() {
       _isSettingsConfigured = settingsConfigured;
       // Don't automatically check API anymore
@@ -53,6 +54,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     try {
       final isReachable = await _apiService.validateApi();
+      if (!mounted) return;
       setState(() {
         _isApiReachable = isReachable;
         _isCheckingApi = false;
@@ -65,6 +67,7 @@ class _MyHomePageState extends State<MyHomePage> {
             : "API validation failed - endpoint not reachable",
       );
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isApiReachable = false;
         _isCheckingApi = false;
@@ -88,23 +91,34 @@ class _MyHomePageState extends State<MyHomePage> {
     // Listen for method calls from the native side (e.g., service status updates)
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'onServiceStatusChanged') {
+        if (!mounted) return;
         setState(() {
           _serviceStatus = call.arguments as String;
         });
       }
     });
-  } // Method to start the native Android foreground service
+  }
+
+  @override
+  void dispose() {
+    _channel.setMethodCallHandler(null);
+    super.dispose();
+  }
+
+  // Method to start the native Android foreground service
 
   Future<void> _startService() async {
     try {
       final String result = await _channel.invokeMethod(
         'startSmsForwardingService',
       );
+      if (!mounted) return;
       setState(() {
         _serviceStatus = result;
       });
       _showSnackBar("Service started: $result");
     } on PlatformException catch (e) {
+      if (!mounted) return;
       setState(() {
         _serviceStatus = "Failed to start: '${e.message}'";
       });
@@ -119,11 +133,13 @@ class _MyHomePageState extends State<MyHomePage> {
       final String result = await _channel.invokeMethod(
         'stopSmsForwardingService',
       );
+      if (!mounted) return;
       setState(() {
         _serviceStatus = result;
       });
       _showSnackBar("Service stopped: $result");
     } on PlatformException catch (e) {
+      if (!mounted) return;
       setState(() {
         _serviceStatus = "Failed to stop: '${e.message}'";
       });
@@ -138,11 +154,13 @@ class _MyHomePageState extends State<MyHomePage> {
       final String result = await _channel.invokeMethod(
         'bindSmsForwardingService',
       );
+      if (!mounted) return;
       setState(() {
         _serviceStatus = result;
       });
       _showSnackBar("Service bind request: $result");
     } on PlatformException catch (e) {
+      if (!mounted) return;
       setState(() {
         _serviceStatus = "Failed to bind: '${e.message}'";
       });
@@ -157,11 +175,13 @@ class _MyHomePageState extends State<MyHomePage> {
       final String result = await _channel.invokeMethod(
         'unbindSmsForwardingService',
       );
+      if (!mounted) return;
       setState(() {
         _serviceStatus = result;
       });
       _showSnackBar("Service unbind request: $result");
     } on PlatformException catch (e) {
+      if (!mounted) return;
       setState(() {
         _serviceStatus = "Failed to unbind: '${e.message}'";
       });
@@ -182,6 +202,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _showSnackBar(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
