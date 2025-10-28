@@ -225,23 +225,45 @@ class MainActivity : FlutterActivity() {
             }
 
             if (prefs.getBoolean(defaultPromptKey, false)) {
-                return
+                // A previous prompt did not lead to switching defaults; reset so we can try again.
+                prefs.edit().remove(defaultPromptKey).apply()
+            }
+
+            val prompt =
+                    AlertDialog.Builder(this)
+                            .setTitle("Set default SMS app")
+                            .setMessage(
+                                    "SMS TO API must be the default SMS application to capture and forward new messages."
+                            )
+                            .setPositiveButton(android.R.string.ok) { _, _ ->
+                                val intent = Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT)
+                                intent.putExtra(
+                                        Telephony.Sms.Intents.EXTRA_PACKAGE_NAME,
+                                        packageName
+                                )
+                                startActivity(intent)
+                            }
+                            .setNegativeButton(android.R.string.cancel) { _, _ ->
+                                Toast.makeText(
+                                                this,
+                                                "SMS forwarding stays inactive until SMS TO API is set as the default app.",
+                                                Toast.LENGTH_LONG
+                                        )
+                                        .show()
+                            }
+                            .create()
+
+            prompt.setOnDismissListener {
+                if (Telephony.Sms.getDefaultSmsPackage(this) != packageName) {
+                    // Allow another prompt on the next resume so forwarding is not silently disabled.
+                    prefs.edit().remove(defaultPromptKey).apply()
+                }
             }
 
             prefs.edit().putBoolean(defaultPromptKey, true).apply()
-
-            AlertDialog.Builder(this)
-                    .setTitle("Set default SMS app")
-                    .setMessage("To read SMS reliably, set SMS TO API as the default SMS application.")
-                    .setPositiveButton(android.R.string.ok) { _, _ ->
-                        val intent = Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT)
-                        intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName)
-                        startActivity(intent)
-                    }
-                    .setNegativeButton(android.R.string.cancel, null)
-                    .show()
-            }
+            prompt.show()
         }
+    }
 
     override fun onRequestPermissionsResult(
         requestCode: Int,
