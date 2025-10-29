@@ -2,7 +2,9 @@ package com.github.dilrandi.sms_to_api
 
 
 import android.Manifest
+import android.app.Activity
 import android.app.AlertDialog
+import android.app.role.RoleManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -25,12 +27,15 @@ class MainActivity : FlutterActivity() {
     private lateinit var settingsChannel: MethodChannel
     private val prefsName = "sms_to_api_prefs"
     private val defaultPromptKey = "default_sms_prompt_shown"
+    private var defaultPromptInFlight = false
+    private var defaultPromptDialog: AlertDialog? = null
 
     private var smsForwardingService: SmsForwardingService? = null
     private var isBound = false // To track if the activity is bound to the service
 
     private val NOTIFICATION_PERMISSION_REQUEST_CODE = 102
     private val SMS_PERMISSION_REQUEST_CODE = 103 // New request code for SMS permissions
+    private val ROLE_REQUEST_CODE = 104
 
     // Defines callbacks for service binding, unbinding, and re-binding.
     private val connection = object : ServiceConnection {
@@ -214,21 +219,39 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun ensureDefaultSmsApp() {
+        val prefs = getSharedPreferences(prefsName, Context.MODE_PRIVATE)
+        if (isCurrentDefaultSmsApp()) {
+            prefs.edit().remove(defaultPromptKey).apply()
+            defaultPromptInFlight = false
+            return
+        }
+
+        if (defaultPromptInFlight) {
+            return
+        }
+
+        // Clear stale flag so we can re-prompt if a previous attempt failed.
+        if (prefs.getBoolean(defaultPromptKey, false)) {
+            prefs.edit().remove(defaultPromptKey).apply()
+        }
+
+        val roleManager =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    getSystemService(RoleManager::class.java)
+                } else {
+                    null
+                }
+
+        if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_SMS)) {
+            defaultPromptInFlight = true
+            prefs.edit().putBoolean(defaultPromptKey, true).apply()
+            val roleIntent = roleManager.createRequestRoleIntent(RoleManager.ROLE_SMS)
+            @Suppress("DEPRECATION")
+            startActivityForResult(roleIntent, ROLE_REQUEST_CODE)
+            return
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            val defaultPackage = Telephony.Sms.getDefaultSmsPackage(this)
-            val prefs = getSharedPreferences(prefsName, Context.MODE_PRIVATE)
-
-            if (defaultPackage == packageName) {
-                // We are already default; allow future prompts if user switches away later.
-                prefs.edit().remove(defaultPromptKey).apply()
-                return
-            }
-
-            if (prefs.getBoolean(defaultPromptKey, false)) {
-                // A previous prompt did not lead to switching defaults; reset so we can try again.
-                prefs.edit().remove(defaultPromptKey).apply()
-            }
-
             val prompt =
                     AlertDialog.Builder(this)
                             .setTitle("Set default SMS app")
@@ -245,7 +268,7 @@ class MainActivity : FlutterActivity() {
                             }
                             .setNegativeButton(android.R.string.cancel) { _, _ ->
                                 Toast.makeText(
-                                                this,
+                                                applicationContext,
                                                 "SMS forwarding stays inactive until SMS TO API is set as the default app.",
                                                 Toast.LENGTH_LONG
                                         )
@@ -254,14 +277,23 @@ class MainActivity : FlutterActivity() {
                             .create()
 
             prompt.setOnDismissListener {
-                if (Telephony.Sms.getDefaultSmsPackage(this) != packageName) {
-                    // Allow another prompt on the next resume so forwarding is not silently disabled.
+                defaultPromptInFlight = false
+                if (!isCurrentDefaultSmsApp()) {
+                    prefs.edit().remove(defaultPromptKey).apply()
+                } else {
                     prefs.edit().remove(defaultPromptKey).apply()
                 }
+                defaultPromptDialog = null
             }
 
-            prefs.edit().putBoolean(defaultPromptKey, true).apply()
-            prompt.show()
+            if (canShowPrompt()) {
+                defaultPromptInFlight = true
+                prefs.edit().putBoolean(defaultPromptKey, true).apply()
+                defaultPromptDialog = prompt
+                prompt.show()
+            } else {
+                defaultPromptDialog = null
+            }
         }
     }
 
@@ -306,6 +338,36 @@ class MainActivity : FlutterActivity() {
             }
         }
     }
+
+    override fun onPause() {
+        super.onPause()
+        defaultPromptDialog?.setOnDismissListener(null)
+        defaultPromptDialog?.dismiss()
+        defaultPromptDialog = null
+        defaultPromptInFlight = false
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == ROLE_REQUEST_CODE) {
+            defaultPromptInFlight = false
+            val prefs = getSharedPreferences(prefsName, Context.MODE_PRIVATE)
+            if (isCurrentDefaultSmsApp()) {
+                prefs.edit().remove(defaultPromptKey).apply()
+            } else {
+                prefs.edit().remove(defaultPromptKey).apply()
+                val message =
+                        if (resultCode == Activity.RESULT_OK) {
+                            "SMS forwarding stays inactive until SMS TO API is confirmed as the default app."
+                        } else {
+                            "SMS forwarding stays inactive until SMS TO API is the default messaging app."
+                        }
+                Toast.makeText(applicationContext, message, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         // Ensure the service is unbound when the activity is destroyed to prevent leaks
@@ -314,5 +376,30 @@ class MainActivity : FlutterActivity() {
             isBound = false
             smsForwardingService = null
         }
+        defaultPromptDialog = null
+        defaultPromptInFlight = false
+    }
+
+    private fun isCurrentDefaultSmsApp(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val roleManager = getSystemService(RoleManager::class.java)
+            if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_SMS)) {
+                if (roleManager.isRoleHeld(RoleManager.ROLE_SMS)) {
+                    return true
+                }
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            val defaultPackage = Telephony.Sms.getDefaultSmsPackage(this)
+            if (defaultPackage == packageName) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun canShowPrompt(): Boolean {
+        if (isFinishing) return false
+        return !(Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && isDestroyed)
     }
 }
