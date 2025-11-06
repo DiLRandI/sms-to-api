@@ -6,11 +6,16 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 data class Endpoint(
@@ -23,8 +28,6 @@ data class Endpoint(
 )
 
 data class AppSettings(
-        val url: String?, // legacy
-        val apiKey: String?, // legacy
         val authHeaderName: String,
         val phoneNumbers: List<String>,
         val endpoints: List<Endpoint>
@@ -35,6 +38,8 @@ class SmsForwardingService : Service() {
     private val TAG = "SmsForwardingService"
     private lateinit var logManager: LogManager
     @Volatile private var boundClients: Int = 0
+    private val serviceJob = SupervisorJob()
+    private val serviceScope = CoroutineScope(serviceJob + Dispatchers.IO)
 
     // Binder given to clients for local interaction
     private val binder = SmsForwardingBinder()
@@ -144,14 +149,14 @@ class SmsForwardingService : Service() {
         // Start the service in the foreground
         startForeground(NOTIFICATION_ID, notification)
 
-        // Keep current behavior but consider NOT_STICKY if not intended to run persistently
-        return START_STICKY
+        // Avoid restarting automatically; the receiver or UI can start the service when needed
+        return START_NOT_STICKY
     }
 
     override fun onDestroy() {
         super.onDestroy()
         logManager.logInfo(TAG, "SmsForwardingService: onDestroy()")
-        // Clean up resources if any (e.g., stop threads, release sensors)
+        serviceJob.cancel()
     }
 
     // --- Notification Helper Methods ---
@@ -183,22 +188,7 @@ class SmsForwardingService : Service() {
         }
 
         val settings = getStoredSettings()
-
-        // Build list of active endpoints (prefer new multi-endpoint config; fallback to legacy)
-        val activeEndpoints: List<Endpoint> =
-                if (settings.endpoints.isNotEmpty()) settings.endpoints.filter { it.active }
-                else if (!settings.url.isNullOrEmpty() && !settings.apiKey.isNullOrEmpty())
-                        listOf(
-                                Endpoint(
-                                        id = "legacy",
-                                        name = "Default",
-                                        url = settings.url!!,
-                                        apiKey = settings.apiKey!!,
-                                        active = true,
-                                        authHeaderName = settings.authHeaderName
-                                )
-                        )
-                else emptyList()
+        val activeEndpoints = settings.endpoints.filter { it.active }
 
         if (activeEndpoints.isEmpty()) {
             logManager.logWarning(TAG, "No active API endpoints configured, skipping API call")
@@ -240,9 +230,10 @@ class SmsForwardingService : Service() {
         )
 
         // Use Kotlin's built-in HttpURLConnection for a simple HTTP POST
-        Thread {
+        serviceScope.launch {
                     try {
                         for (endpoint in activeEndpoints) {
+                            if (!isActive) break
                             try {
                                 val apiUrl = java.net.URL(endpoint.url)
                                 val connection =
@@ -264,10 +255,10 @@ class SmsForwardingService : Service() {
                                 jsonBody.put("is_multipart", smsPartsCount > 1)
                                 jsonBody.put("endpoint_name", endpoint.name)
 
-                                val outputStream = connection.outputStream
-                                outputStream.write(jsonBody.toString().toByteArray(Charsets.UTF_8))
-                                outputStream.flush()
-                                outputStream.close()
+                                connection.outputStream.use { outputStream ->
+                                    outputStream.write(jsonBody.toString().toByteArray(Charsets.UTF_8))
+                                    outputStream.flush()
+                                }
 
                                 val responseCode = connection.responseCode
                                 when {
@@ -305,35 +296,31 @@ class SmsForwardingService : Service() {
                         }
                     } finally {
                         if (autoStopWhenDone && boundClients == 0) {
-                            try {
-                                stopForeground(true)
-                            } catch (_: Exception) {}
-                            try {
-                                stopSelf(serviceStartId)
-                            } catch (_: Exception) {}
+                            withContext(Dispatchers.Main) {
+                                try {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                        stopForeground(STOP_FOREGROUND_REMOVE)
+                                    } else {
+                                        @Suppress("DEPRECATION")
+                                        stopForeground(true)
+                                    }
+                                } catch (_: Exception) {}
+                                try {
+                                    stopSelf(serviceStartId)
+                                } catch (_: Exception) {}
+                            }
                         }
                     }
                 }
-                .start()
         return true
     }
 
     private fun getStoredSettings(): AppSettings {
-        val sharedPrefs: SharedPreferences =
-                getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-        val settingsJson = sharedPrefs.getString("flutter.settings_data", null)
+        val settingsJson = SecureSettingsBridge.read(applicationContext)
 
         return if (settingsJson != null) {
             try {
                 val jsonObject = JSONObject(settingsJson)
-                val url =
-                        if (jsonObject.optString("url", "").isNotEmpty())
-                                jsonObject.optString("url", "")
-                        else null
-                val apiKey =
-                        if (jsonObject.optString("apiKey", "").isNotEmpty())
-                                jsonObject.optString("apiKey", "")
-                        else null
                 val authHeaderName = jsonObject.optString("authHeaderName", "Authorization")
                 val phoneNumbers = mutableListOf<String>()
 
@@ -363,14 +350,14 @@ class SmsForwardingService : Service() {
                     }
                 }
 
-                AppSettings(url, apiKey, authHeaderName, phoneNumbers, endpoints)
+                AppSettings(authHeaderName, phoneNumbers, endpoints)
             } catch (e: Exception) {
                 logManager.logError(TAG, "Error parsing settings JSON: ${e.message}", e)
-                AppSettings(null, null, "Authorization", emptyList(), emptyList())
+                AppSettings("Authorization", emptyList(), emptyList())
             }
         } else {
             logManager.logDebug(TAG, "No settings found in SharedPreferences")
-            AppSettings(null, null, "Authorization", emptyList(), emptyList())
+            AppSettings("Authorization", emptyList(), emptyList())
         }
     }
 

@@ -26,6 +26,7 @@ class _ApiEndpointsScreenState extends State<ApiEndpointsScreen> {
 
   Future<void> _load() async {
     final s = await _storage.load();
+    if (!mounted) return;
     setState(() {
       _endpoints = List.of(s?.endpoints ?? []);
       _isLoading = false;
@@ -35,8 +36,6 @@ class _ApiEndpointsScreenState extends State<ApiEndpointsScreen> {
   Future<void> _save({Settings? base}) async {
     final existing = base ?? await _storage.load();
     final updated = Settings(
-      url: existing?.url ?? '',
-      apiKey: existing?.apiKey ?? '',
       endpoints: _endpoints,
       authHeaderName: existing?.authHeaderName ?? 'Authorization',
       phoneNumbers: existing?.phoneNumbers ?? const [],

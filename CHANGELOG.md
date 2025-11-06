@@ -3,7 +3,24 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
-- Add tests or samples for early-stop logic (planned)
+- _No notable changes yet._
+
+## [2.0.0] - 2025-11-06
+### Added
+- Secure settings bridge using encrypted storage with automatic legacy migration.
+- Structured Kotlin coroutine dispatcher for foreground service network work.
+- Test coverage for storage migration, API header fallbacks, and log sanitization.
+
+### Breaking
+- Removed legacy single-endpoint storage fallbacks; the v2 settings model now requires endpoint profiles for API forwarding.
+
+### Changed
+- Foreground service now returns `START_NOT_STICKY` and stops from the main thread once work completes.
+- Flutter UI guards asynchronous `setState` calls with `mounted` checks and detaches native listeners on dispose.
+- Android activity surfaces SMS permission rationale and shared method channels for secure storage without requiring default-SMS handover.
+
+### Docs
+- Updated README/AGENTS to describe non-default SMS support and the streamlined settings model.
 
 ## [1.1.0] - 2025-09-03
 ### Fixed
@@ -17,4 +34,3 @@ All notable changes to this project will be documented in this file.
 
 ### Notes
 - Consider adding a pre-check in `SmsReceiver` to skip starting the service when the sender is known to be disallowed (optimization).
-
