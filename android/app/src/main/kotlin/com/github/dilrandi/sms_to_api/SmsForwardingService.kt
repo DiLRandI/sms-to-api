@@ -28,8 +28,6 @@ data class Endpoint(
 )
 
 data class AppSettings(
-        val url: String?, // legacy
-        val apiKey: String?, // legacy
         val authHeaderName: String,
         val phoneNumbers: List<String>,
         val endpoints: List<Endpoint>
@@ -190,22 +188,7 @@ class SmsForwardingService : Service() {
         }
 
         val settings = getStoredSettings()
-
-        // Build list of active endpoints (prefer new multi-endpoint config; fallback to legacy)
-        val activeEndpoints: List<Endpoint> =
-                if (settings.endpoints.isNotEmpty()) settings.endpoints.filter { it.active }
-                else if (!settings.url.isNullOrEmpty() && !settings.apiKey.isNullOrEmpty())
-                        listOf(
-                                Endpoint(
-                                        id = "legacy",
-                                        name = "Default",
-                                        url = settings.url!!,
-                                        apiKey = settings.apiKey!!,
-                                        active = true,
-                                        authHeaderName = settings.authHeaderName
-                                )
-                        )
-                else emptyList()
+        val activeEndpoints = settings.endpoints.filter { it.active }
 
         if (activeEndpoints.isEmpty()) {
             logManager.logWarning(TAG, "No active API endpoints configured, skipping API call")
@@ -338,14 +321,6 @@ class SmsForwardingService : Service() {
         return if (settingsJson != null) {
             try {
                 val jsonObject = JSONObject(settingsJson)
-                val url =
-                        if (jsonObject.optString("url", "").isNotEmpty())
-                                jsonObject.optString("url", "")
-                        else null
-                val apiKey =
-                        if (jsonObject.optString("apiKey", "").isNotEmpty())
-                                jsonObject.optString("apiKey", "")
-                        else null
                 val authHeaderName = jsonObject.optString("authHeaderName", "Authorization")
                 val phoneNumbers = mutableListOf<String>()
 
@@ -375,14 +350,14 @@ class SmsForwardingService : Service() {
                     }
                 }
 
-                AppSettings(url, apiKey, authHeaderName, phoneNumbers, endpoints)
+                AppSettings(authHeaderName, phoneNumbers, endpoints)
             } catch (e: Exception) {
                 logManager.logError(TAG, "Error parsing settings JSON: ${e.message}", e)
-                AppSettings(null, null, "Authorization", emptyList(), emptyList())
+                AppSettings("Authorization", emptyList(), emptyList())
             }
         } else {
             logManager.logDebug(TAG, "No settings found in SharedPreferences")
-            AppSettings(null, null, "Authorization", emptyList(), emptyList())
+            AppSettings("Authorization", emptyList(), emptyList())
         }
     }
 

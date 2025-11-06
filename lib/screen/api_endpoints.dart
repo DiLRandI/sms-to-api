@@ -36,8 +36,6 @@ class _ApiEndpointsScreenState extends State<ApiEndpointsScreen> {
   Future<void> _save({Settings? base}) async {
     final existing = base ?? await _storage.load();
     final updated = Settings(
-      url: existing?.url ?? '',
-      apiKey: existing?.apiKey ?? '',
       endpoints: _endpoints,
       authHeaderName: existing?.authHeaderName ?? 'Authorization',
       phoneNumbers: existing?.phoneNumbers ?? const [],

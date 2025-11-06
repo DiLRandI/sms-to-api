@@ -31,7 +31,7 @@ architecture-beta
 
 - Configure multiple REST API endpoints with individual auth headers
 - Validate API connectivity (manual validation with feedback)
-- Store settings securely using encrypted preferences with automatic legacy migration
+- Store settings securely using encrypted preferences (falls back to shared preferences when secure storage is unavailable)
 - Forward SMS messages to the API
 - Start/stop/bind/unbind Android foreground service
 - View service status and logs
@@ -125,7 +125,7 @@ Use the home screen shortcuts to configure profiles and sender allow-lists:
 - Requires SMS permissions and a foreground service to receive messages reliably.
 - Validate on a real device for background delivery and service behavior.
 - Service early-stop: when an incoming SMS does not match configured phone numbers (or no endpoints are active), the service stops immediately and does not remain in the foreground.
-- The app must be the **default SMS handler** on Android 11+ to receive broadcasted SMS messages. The home activity now prompts to switch if necessary.
+- Works as a non-default SMS handler by listening for `android.provider.Telephony.SMS_RECEIVED` broadcasts (requires the RECEIVE_SMS runtime permission on modern Android).
 - Foreground work runs on structured Kotlin coroutines and the service returns `START_NOT_STICKY` to comply with modern Android background limits. Keep an eye on OEM-specific battery optimizations.
 
 ## Security

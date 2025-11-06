@@ -50,8 +50,6 @@ class _PhoneNumbersScreenState extends State<PhoneNumbersScreen> {
     try {
       final currentSettings = await _storage.load();
       final updatedSettings = Settings(
-        url: currentSettings?.url ?? '',
-        apiKey: currentSettings?.apiKey ?? '',
         endpoints: currentSettings?.endpoints ?? const [],
         authHeaderName: currentSettings?.authHeaderName ?? 'Authorization',
         phoneNumbers: _phoneNumbers,

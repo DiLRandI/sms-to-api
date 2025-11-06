@@ -11,10 +11,11 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - Foreground service now returns `START_NOT_STICKY` and stops from the main thread once work completes.
 - Flutter UI guards asynchronous `setState` calls with `mounted` checks and detaches native listeners on dispose.
-- Android activity surfaces SMS permission rationale, default-SMS guidance, and shared method channels for secure storage.
+- Android activity surfaces SMS permission rationale and shared method channels for secure storage without requiring default-SMS handover.
+- Removed legacy single-endpoint storage fallbacks in preparation for v2; only multi-endpoint profiles are persisted going forward.
 
 ### Docs
-- Updated README/AGENTS to describe secure storage, sender allow-lists, default SMS requirement, and new test locations.
+- Updated README/AGENTS to describe non-default SMS support and the streamlined settings model.
 
 ## [1.1.0] - 2025-09-03
 ### Fixed

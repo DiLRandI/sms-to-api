@@ -2,10 +2,7 @@ package com.github.dilrandi.sms_to_api
 
 
 import android.Manifest
-import android.app.Activity
 import android.app.AlertDialog
-import android.app.role.RoleManager
-import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -13,7 +10,6 @@ import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
-import android.provider.Telephony
 import android.util.Log
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
@@ -26,17 +22,12 @@ class MainActivity : FlutterActivity() {
     private val settingsChannelName = "com.github.dilrandi.sms_to_api/settings"
     private lateinit var serviceChannel: MethodChannel
     private lateinit var settingsChannel: MethodChannel
-    private val prefsName = "sms_to_api_prefs"
-    private val defaultPromptKey = "default_sms_prompt_shown"
-    private var defaultPromptInFlight = false
-    private var defaultPromptDialog: AlertDialog? = null
 
     private var smsForwardingService: SmsForwardingService? = null
     private var isBound = false // To track if the activity is bound to the service
 
     private val NOTIFICATION_PERMISSION_REQUEST_CODE = 102
     private val SMS_PERMISSION_REQUEST_CODE = 103 // New request code for SMS permissions
-    private val ROLE_REQUEST_CODE = 104
 
     // Defines callbacks for service binding, unbinding, and re-binding.
     private val connection = object : ServiceConnection {
@@ -170,7 +161,6 @@ class MainActivity : FlutterActivity() {
         super.onResume()
         // Request SMS permissions when the activity resumes
         requestSmsPermissions()
-        ensureDefaultSmsApp()
     }
 
     private fun requestSmsPermissions() {
@@ -219,30 +209,6 @@ class MainActivity : FlutterActivity() {
                 .show()
     }
 
-    private fun ensureDefaultSmsApp() {
-        val prefs = getSharedPreferences(prefsName, Context.MODE_PRIVATE)
-        if (isCurrentDefaultSmsApp()) {
-            prefs.edit().remove(defaultPromptKey).apply()
-            defaultPromptInFlight = false
-            return
-        }
-
-        if (defaultPromptInFlight) {
-            return
-        }
-
-        // Clear stale flag so we can re-prompt if a previous attempt failed.
-        if (prefs.getBoolean(defaultPromptKey, false)) {
-            prefs.edit().remove(defaultPromptKey).apply()
-        }
-
-        if (tryRequestDefaultSmsRole()) {
-            return
-        }
-
-        showLegacyDefaultSmsPrompt()
-    }
-
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
@@ -285,35 +251,6 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    override fun onPause() {
-        super.onPause()
-        defaultPromptDialog?.setOnDismissListener(null)
-        defaultPromptDialog?.dismiss()
-        defaultPromptDialog = null
-        defaultPromptInFlight = false
-    }
-
-    @Suppress("DEPRECATION")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == ROLE_REQUEST_CODE) {
-            defaultPromptInFlight = false
-            val prefs = getSharedPreferences(prefsName, Context.MODE_PRIVATE)
-            if (isCurrentDefaultSmsApp()) {
-                prefs.edit().remove(defaultPromptKey).apply()
-            } else {
-                prefs.edit().remove(defaultPromptKey).apply()
-                val fallbackMessage =
-                        if (resultCode == Activity.RESULT_OK) {
-                            "Your device blocked SMS TO API from taking over automatically. Tap OK to open the system picker and finish setting it as the default SMS app."
-                        } else {
-                            "SMS TO API must be the default SMS application to capture and forward new messages. Tap OK to open the system picker."
-                        }
-                showLegacyDefaultSmsPrompt(fallbackMessage)
-            }
-        }
-    }
-
     override fun onDestroy() {
         super.onDestroy()
         // Ensure the service is unbound when the activity is destroyed to prevent leaks
@@ -321,129 +258,6 @@ class MainActivity : FlutterActivity() {
             unbindService(connection)
             isBound = false
             smsForwardingService = null
-        }
-        defaultPromptDialog = null
-        defaultPromptInFlight = false
-    }
-
-    private fun isCurrentDefaultSmsApp(): Boolean {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val roleManager = getSystemService(RoleManager::class.java)
-            if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_SMS)) {
-                if (roleManager.isRoleHeld(RoleManager.ROLE_SMS)) {
-                    return true
-                }
-            }
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            val defaultPackage = Telephony.Sms.getDefaultSmsPackage(this)
-            if (defaultPackage == packageName) {
-                return true
-            }
-        }
-        return false
-    }
-
-    private fun canShowPrompt(): Boolean {
-        if (isFinishing) return false
-        return !(Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && isDestroyed)
-    }
-
-    @Suppress("DEPRECATION")
-    private fun tryRequestDefaultSmsRole(): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            return false
-        }
-        val roleManager = getSystemService(RoleManager::class.java) ?: return false
-        if (!roleManager.isRoleAvailable(RoleManager.ROLE_SMS)) {
-            return false
-        }
-
-        val prefs = getSharedPreferences(prefsName, Context.MODE_PRIVATE)
-        return try {
-            defaultPromptInFlight = true
-            prefs.edit().putBoolean(defaultPromptKey, true).apply()
-            val roleIntent = roleManager.createRequestRoleIntent(RoleManager.ROLE_SMS)
-            startActivityForResult(roleIntent, ROLE_REQUEST_CODE)
-            true
-        } catch (e: ActivityNotFoundException) {
-            Log.w("MainActivity", "ROLE_SMS intent unavailable, falling back to legacy prompt", e)
-            defaultPromptInFlight = false
-            prefs.edit().remove(defaultPromptKey).apply()
-            false
-        } catch (e: SecurityException) {
-            Log.w("MainActivity", "ROLE_SMS request blocked by platform, falling back", e)
-            defaultPromptInFlight = false
-            prefs.edit().remove(defaultPromptKey).apply()
-            false
-        }
-    }
-
-    private fun showLegacyDefaultSmsPrompt(messageOverride: String? = null) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
-            return
-        }
-
-        val prefs = getSharedPreferences(prefsName, Context.MODE_PRIVATE)
-        val promptMessage =
-                messageOverride
-                        ?: "SMS TO API must be the default SMS application to capture and forward new messages."
-
-        val prompt =
-                AlertDialog.Builder(this)
-                        .setTitle("Set default SMS app")
-                        .setMessage(promptMessage)
-                        .setPositiveButton(android.R.string.ok) { _, _ ->
-                            launchDefaultSmsSettings()
-                        }
-                        .setNegativeButton(android.R.string.cancel) { _, _ ->
-                            Toast.makeText(
-                                            applicationContext,
-                                            "SMS forwarding stays inactive until SMS TO API is set as the default app.",
-                                            Toast.LENGTH_LONG
-                                    )
-                                    .show()
-                        }
-                        .create()
-
-        prompt.setOnDismissListener {
-            defaultPromptInFlight = false
-            prefs.edit().remove(defaultPromptKey).apply()
-            defaultPromptDialog = null
-        }
-
-        if (canShowPrompt()) {
-            defaultPromptInFlight = true
-            prefs.edit().putBoolean(defaultPromptKey, true).apply()
-            defaultPromptDialog = prompt
-            prompt.show()
-        } else {
-            defaultPromptDialog = null
-        }
-    }
-
-    private fun launchDefaultSmsSettings() {
-        val intent = Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT).apply {
-            putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName)
-        }
-        try {
-            startActivity(intent)
-        } catch (e: ActivityNotFoundException) {
-            Log.w("MainActivity", "ACTION_CHANGE_DEFAULT unavailable on this device", e)
-            Toast.makeText(
-                            applicationContext,
-                            "Open system settings and set SMS TO API as the default SMS app manually.",
-                            Toast.LENGTH_LONG
-                    )
-                    .show()
-        } catch (e: SecurityException) {
-            Log.w("MainActivity", "ACTION_CHANGE_DEFAULT blocked by platform policies", e)
-            Toast.makeText(
-                            applicationContext,
-                            "Device policies are blocking the default SMS change. Adjust security settings and retry.",
-                            Toast.LENGTH_LONG
-                    )
-                    .show()
         }
     }
 }
