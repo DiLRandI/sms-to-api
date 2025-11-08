@@ -122,6 +122,7 @@ Use the home screen shortcuts to configure profiles and sender allow-lists:
 
 ## Android Notes
 
+- Minimum supported version: Android 7.1 (API 25). Earlier platform shims were removed to keep the native code modern and lean.
 - Requires SMS permissions and a foreground service to receive messages reliably.
 - Validate on a real device for background delivery and service behavior.
 - Service early-stop: when an incoming SMS does not match configured phone numbers (or no endpoints are active), the service stops immediately and does not remain in the foreground.

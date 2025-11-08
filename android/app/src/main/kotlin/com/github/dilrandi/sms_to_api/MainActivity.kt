@@ -53,6 +53,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        PermissionMonitor.ensureMonitoring(applicationContext)
         serviceChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, serviceChannelName)
         
         serviceChannel.setMethodCallHandler { call, result ->
@@ -164,33 +165,31 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun requestSmsPermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val permissionsToRequest = mutableListOf<String>()
-            if (checkSelfPermission(Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED) {
-                permissionsToRequest.add(Manifest.permission.RECEIVE_SMS)
-            }
-            if (checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
-                permissionsToRequest.add(Manifest.permission.READ_SMS)
+        val permissionsToRequest = mutableListOf<String>()
+        if (checkSelfPermission(Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.RECEIVE_SMS)
+        }
+        if (checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.READ_SMS)
+        }
+
+        if (permissionsToRequest.isNotEmpty()) {
+            val permissionsArray = permissionsToRequest.toTypedArray()
+            val needsRationale = permissionsArray.any {
+                ActivityCompat.shouldShowRequestPermissionRationale(this, it)
             }
 
-            if (permissionsToRequest.isNotEmpty()) {
-                val permissionsArray = permissionsToRequest.toTypedArray()
-                val needsRationale = permissionsArray.any {
-                    ActivityCompat.shouldShowRequestPermissionRationale(this, it)
-                }
-
-                if (needsRationale) {
-                    showSmsPermissionRationale(permissionsArray)
-                } else {
-                    ActivityCompat.requestPermissions(
-                            this,
-                            permissionsArray,
-                            SMS_PERMISSION_REQUEST_CODE
-                    )
-                }
+            if (needsRationale) {
+                showSmsPermissionRationale(permissionsArray)
             } else {
-                Log.d("MainActivity", "SMS permissions already granted.")
+                ActivityCompat.requestPermissions(
+                        this,
+                        permissionsArray,
+                        SMS_PERMISSION_REQUEST_CODE
+                )
             }
+        } else {
+            Log.d("MainActivity", "SMS permissions already granted.")
         }
     }
 
