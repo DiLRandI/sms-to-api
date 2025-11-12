@@ -13,30 +13,14 @@ import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
-
-data class Endpoint(
-        val id: String,
-        val name: String,
-        val url: String,
-        val apiKey: String,
-        val active: Boolean,
-        val authHeaderName: String = "Authorization"
-)
-
-data class AppSettings(
-        val authHeaderName: String,
-        val phoneNumbers: List<String>,
-        val endpoints: List<Endpoint>
-)
 
 class SmsForwardingService : Service() {
 
     private val TAG = "SmsForwardingService"
     private lateinit var logManager: LogManager
+    private lateinit var forwardingTask: SmsForwardingTask
     @Volatile private var boundClients: Int = 0
     private val serviceJob = SupervisorJob()
     private val serviceScope = CoroutineScope(serviceJob + Dispatchers.IO)
@@ -56,12 +40,19 @@ class SmsForwardingService : Service() {
     // Public method to test API with sample data
     fun testApiCall() {
         logManager.logInfo(TAG, "Manual API test initiated")
-        // Call the private sendToApi method for testing
-        sendToApi(
-                "TEST_SENDER",
-                "This is a test message for API verification - triggered manually",
-                1
-        )
+        serviceScope.launch {
+            val plan =
+                    forwardingTask.planWork(
+                            "TEST_SENDER",
+                            "This is a test message for API verification - triggered manually",
+                            1
+                    )
+            if (plan == null) {
+                logManager.logWarning(TAG, "Test API call skipped because no endpoints are configured")
+                return@launch
+            }
+            forwardingTask.execute(plan)
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? {
@@ -85,10 +76,12 @@ class SmsForwardingService : Service() {
     override fun onCreate() {
         super.onCreate()
         logManager = LogManager(this)
+        forwardingTask = SmsForwardingTask(this)
         logManager.logInfo(TAG, "SmsForwardingService: onCreate() - Service starting up")
         logManager.logDebug(TAG, "Initializing SMS forwarding service")
         createNotificationChannel() // Create notification channel for Android O+
         logManager.logInfo(TAG, "SMS forwarding service initialization completed successfully")
+        PermissionMonitor.ensureMonitoring(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -104,7 +97,6 @@ class SmsForwardingService : Service() {
             val smsPartsCount = intent.getIntExtra("sms_parts_count", 1)
             val autoStop = intent.getBooleanExtra("auto_stop", false)
 
-            // Truncate body in logs for readability/privacy; keep full body for API payload
             val safeBody = (smsBody ?: "").let { if (it.length > 160) it.take(160) + "…" else it }
             if (smsPartsCount > 1) {
                 logManager.logInfo(
@@ -114,14 +106,33 @@ class SmsForwardingService : Service() {
             } else {
                 logManager.logInfo(TAG, "Received SMS from $smsSender with body: $safeBody")
             }
-            // Send SMS data to API(s); if no work is started, stop early to avoid lingering service
-            val workStarted = sendToApi(smsSender, smsBody, smsPartsCount, autoStop, startId)
-            if (!workStarted && autoStop && boundClients == 0) {
-                logManager.logDebug(TAG, "No work started; stopping service early (startId=$startId)")
-                try {
-                    stopSelf(startId)
-                } catch (_: Exception) {}
+
+            val plan = forwardingTask.planWork(smsSender, smsBody, smsPartsCount)
+            if (plan == null) {
+                if (autoStop && boundClients == 0) {
+                    logManager.logDebug(TAG, "No work plan created; stopping service early (startId=$startId)")
+                    try {
+                        stopSelf(startId)
+                    } catch (_: Exception) {}
+                }
                 return START_NOT_STICKY
+            }
+
+            serviceScope.launch {
+                try {
+                    forwardingTask.execute(plan)
+                } finally {
+                    if (autoStop && boundClients == 0) {
+                        withContext(Dispatchers.Main) {
+                            try {
+                                stopForeground(STOP_FOREGROUND_REMOVE)
+                            } catch (_: Exception) {}
+                            try {
+                                stopSelf(startId)
+                            } catch (_: Exception) {}
+                        }
+                    }
+                }
             }
         }
 
@@ -172,192 +183,6 @@ class SmsForwardingService : Service() {
                             )
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(serviceChannel)
-        }
-    }
-
-    private fun sendToApi(
-            smsSender: String?,
-            smsBody: String?,
-            smsPartsCount: Int = 1,
-            autoStopWhenDone: Boolean = false,
-            serviceStartId: Int = 0
-    ): Boolean {
-        if (smsSender == null || smsBody == null) {
-            logManager.logWarning(TAG, "SMS sender or body is null, skipping API call")
-            return false
-        }
-
-        val settings = getStoredSettings()
-        val activeEndpoints = settings.endpoints.filter { it.active }
-
-        if (activeEndpoints.isEmpty()) {
-            logManager.logWarning(TAG, "No active API endpoints configured, skipping API call")
-            return false
-        }
-
-        // Check if phone numbers are configured and if sender matches any of them
-        if (settings.phoneNumbers.isNotEmpty()) {
-            val senderMatches =
-                    settings.phoneNumbers.any { configuredNumber ->
-                        // Check for exact match or if the sender contains the configured number
-                        smsSender == configuredNumber ||
-                                smsSender.contains(configuredNumber) ||
-                                configuredNumber.contains(smsSender)
-                    }
-
-            if (!senderMatches) {
-                logManager.logDebug(
-                        TAG,
-                        "SMS sender '$smsSender' does not match any configured phone numbers: ${settings.phoneNumbers}. Skipping API call"
-                )
-                return false
-            }
-
-            logManager.logInfo(
-                    TAG,
-                    "SMS sender '$smsSender' matches configured phone numbers. Proceeding with API call"
-            )
-        } else {
-            logManager.logInfo(TAG, "No phone numbers configured, sending all SMS to API")
-        }
-
-        val messageInfo = if (smsPartsCount > 1) "multi-part SMS ($smsPartsCount parts)" else "SMS"
-        val safeBodyForSendLog =
-                (smsBody ?: "").let { if (it.length > 160) it.take(160) + "…" else it }
-        logManager.logInfo(
-                TAG,
-                "Sending $messageInfo to ${activeEndpoints.size} API endpoint(s): sender=$smsSender, body=$safeBodyForSendLog"
-        )
-
-        // Use Kotlin's built-in HttpURLConnection for a simple HTTP POST
-        serviceScope.launch {
-                    try {
-                        for (endpoint in activeEndpoints) {
-                            if (!isActive) break
-                            try {
-                                val apiUrl = java.net.URL(endpoint.url)
-                                val connection =
-                                        apiUrl.openConnection() as java.net.HttpURLConnection
-                                connection.requestMethod = "POST"
-                                connection.setRequestProperty("Content-Type", "application/json")
-                                val headerName =
-                                        if (endpoint.authHeaderName.isNotEmpty()) endpoint.authHeaderName
-                                        else settings.authHeaderName
-                                connection.setRequestProperty(headerName, endpoint.apiKey)
-                                connection.doOutput = true
-                                connection.connectTimeout = 10000
-                                connection.readTimeout = 10000
-
-                                val jsonBody = JSONObject()
-                                jsonBody.put("sender", smsSender)
-                                jsonBody.put("body", smsBody)
-                                jsonBody.put("parts_count", smsPartsCount)
-                                jsonBody.put("is_multipart", smsPartsCount > 1)
-                                jsonBody.put("endpoint_name", endpoint.name)
-
-                                connection.outputStream.use { outputStream ->
-                                    outputStream.write(jsonBody.toString().toByteArray(Charsets.UTF_8))
-                                    outputStream.flush()
-                                }
-
-                                val responseCode = connection.responseCode
-                                when {
-                                    responseCode >= 500 ->
-                                            logManager.logError(
-                                                    TAG,
-                                                    "${endpoint.name}: server error ($responseCode)"
-                                            )
-                                    responseCode >= 400 ->
-                                            logManager.logWarning(
-                                                    TAG,
-                                                    "${endpoint.name}: client error ($responseCode)"
-                                            )
-                                    else ->
-                                            logManager.logInfo(
-                                                    TAG,
-                                                    "${endpoint.name}: request succeeded ($responseCode)"
-                                            )
-                                }
-                                try {
-                                    if (responseCode >= 400) {
-                                        connection.errorStream?.close()
-                                    } else {
-                                        connection.inputStream?.close()
-                                    }
-                                } catch (_: Exception) {}
-                                connection.disconnect()
-                            } catch (e: Exception) {
-                                logManager.logError(
-                                        TAG,
-                                        "${endpoint.name}: error sending SMS: ${e.message}",
-                                        e
-                                )
-                            }
-                        }
-                    } finally {
-                        if (autoStopWhenDone && boundClients == 0) {
-                            withContext(Dispatchers.Main) {
-                                try {
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                                        stopForeground(STOP_FOREGROUND_REMOVE)
-                                    } else {
-                                        @Suppress("DEPRECATION")
-                                        stopForeground(true)
-                                    }
-                                } catch (_: Exception) {}
-                                try {
-                                    stopSelf(serviceStartId)
-                                } catch (_: Exception) {}
-                            }
-                        }
-                    }
-                }
-        return true
-    }
-
-    private fun getStoredSettings(): AppSettings {
-        val settingsJson = SecureSettingsBridge.read(applicationContext)
-
-        return if (settingsJson != null) {
-            try {
-                val jsonObject = JSONObject(settingsJson)
-                val authHeaderName = jsonObject.optString("authHeaderName", "Authorization")
-                val phoneNumbers = mutableListOf<String>()
-
-                // Parse phone numbers array if it exists
-                if (jsonObject.has("phoneNumbers")) {
-                    val phoneNumbersArray = jsonObject.getJSONArray("phoneNumbers")
-                    for (i in 0 until phoneNumbersArray.length()) {
-                        phoneNumbers.add(phoneNumbersArray.getString(i))
-                    }
-                }
-
-                // Parse endpoints array if it exists
-                val endpoints = mutableListOf<Endpoint>()
-                if (jsonObject.has("endpoints")) {
-                    val arr = jsonObject.getJSONArray("endpoints")
-                    for (i in 0 until arr.length()) {
-                        val o = arr.getJSONObject(i)
-                        val id = o.optString("id", i.toString())
-                        val name = o.optString("name", "Endpoint ${i + 1}")
-                        val epUrl = o.optString("url", "")
-                        val epKey = o.optString("apiKey", "")
-                        val active = o.optBoolean("active", true)
-                        val header = o.optString("authHeaderName", "Authorization")
-                        if (epUrl.isNotEmpty() && epKey.isNotEmpty()) {
-                            endpoints.add(Endpoint(id, name, epUrl, epKey, active, header))
-                        }
-                    }
-                }
-
-                AppSettings(authHeaderName, phoneNumbers, endpoints)
-            } catch (e: Exception) {
-                logManager.logError(TAG, "Error parsing settings JSON: ${e.message}", e)
-                AppSettings("Authorization", emptyList(), emptyList())
-            }
-        } else {
-            logManager.logDebug(TAG, "No settings found in SharedPreferences")
-            AppSettings("Authorization", emptyList(), emptyList())
         }
     }
 

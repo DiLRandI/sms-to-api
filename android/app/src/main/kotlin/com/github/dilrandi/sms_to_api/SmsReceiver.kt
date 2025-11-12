@@ -1,11 +1,13 @@
 package com.github.dilrandi.sms_to_api
 
+import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
+import android.content.pm.PackageManager
 import android.provider.Telephony
 import android.telephony.SmsMessage
+import androidx.core.content.ContextCompat
 
 class SmsReceiver : BroadcastReceiver() {
 
@@ -22,6 +24,17 @@ class SmsReceiver : BroadcastReceiver() {
                 LogManager(it)
                         .logWarning(TAG, "Invalid intent or action received: ${intent?.action}")
             }
+            return
+        }
+
+        PermissionMonitor.ensureMonitoring(context)
+
+        val hasPermission =
+                ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) ==
+                        PackageManager.PERMISSION_GRANTED
+        if (!hasPermission) {
+            LogManager(context)
+                    .logWarning(TAG, "RECEIVE_SMS permission missing; cannot process incoming messages.")
             return
         }
 
@@ -52,31 +65,14 @@ class SmsReceiver : BroadcastReceiver() {
         LogManager(context).logDebug(TAG, fullMessage)
 
         // Send the complete concatenated message as a single API call
-        val serviceIntent =
-                Intent(context, SmsForwardingService::class.java).apply {
-                    action = SmsForwardingService.ACTION_FORWARD_SMS_TO_API
-                    putExtra("sms_sender", sender)
-                    putExtra("sms_body", completeMessageBody)
-                    putExtra("sms_parts_count", messageCount)
-                    // Indicate the service can stop itself after handling this work
-                    putExtra("auto_stop", true)
-                }
-
-        // Start the service appropriately based on Android version
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(serviceIntent)
-            } else {
-                context.startService(serviceIntent)
-            }
-            LogManager(context)
-                    .logDebug(
-                            TAG,
-                            "Sent intent to SmsForwardingService with complete message (${messageCount} parts)."
-                    )
-        } catch (e: IllegalStateException) {
-            LogManager(context)
-                    .logError(TAG, "Failed to start SmsForwardingService: ${e.message}", e)
-        }
+        SmsForwardingWorker.enqueue(
+                context.applicationContext,
+                sender,
+                completeMessageBody,
+                messageCount,
+                System.currentTimeMillis()
+        )
+        LogManager(context)
+                .logInfo(TAG, "Enqueued SMS forwarding work for sender: $sender (parts: $messageCount)")
     }
 }
