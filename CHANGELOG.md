@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 - _No notable changes yet._
 
+## [2.1.0] - 2025-11-12
+### Changed
+- Bumped the Flutter app version metadata to `2.1.0+3` so the next minor release is reflected in both Dart and native targets.
+- Updated release-specific documentation and agent guidance to reference the new version and line up with the ship date.
+
+### Docs
+- Added this release entry and refreshed any downstream guidance that previously pointed at `2.0.0`.
+
 ## [2.0.0] - 2025-11-06
 ### Added
 - Secure settings bridge using encrypted storage with automatic legacy migration.
