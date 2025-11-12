@@ -1,4 +1,4 @@
-package com.github.dilrandi.sms_to_api
+package com.github.dilrandi.smstoapi
 
 
 import android.Manifest
@@ -18,8 +18,8 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val serviceChannelName = "com.github.dilrandi.sms_to_api_service/sms_forwarding"
-    private val settingsChannelName = "com.github.dilrandi.sms_to_api/settings"
+    private val serviceChannelName = "com.github.dilrandi.smstoapi_service/sms_forwarding"
+    private val settingsChannelName = "com.github.dilrandi.smstoapi/settings"
     private lateinit var serviceChannel: MethodChannel
     private lateinit var settingsChannel: MethodChannel
 

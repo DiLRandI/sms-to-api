@@ -9,7 +9,7 @@ class Storage {
       : _channel = channel ?? const MethodChannel(channelName);
 
   static const String channelName =
-      'com.github.dilrandi.sms_to_api/settings';
+      'com.github.dilrandi.smstoapi/settings';
   static const String _legacySettingsKey = 'settings_data';
   final MethodChannel _channel;
 
