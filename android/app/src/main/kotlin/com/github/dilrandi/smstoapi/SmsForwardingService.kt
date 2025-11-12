@@ -1,4 +1,4 @@
-package com.github.dilrandi.sms_to_api
+package com.github.dilrandi.smstoapi
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -189,6 +189,6 @@ class SmsForwardingService : Service() {
     companion object {
         const val CHANNEL_ID = "SmsForwardingServiceChannel"
         const val NOTIFICATION_ID = 101 // Unique ID for your notification
-        const val ACTION_FORWARD_SMS_TO_API = "com.github.dilrandi.sms_to_api.FORWARD_SMS_TO_API"
+        const val ACTION_FORWARD_SMS_TO_API = "com.github.dilrandi.smstoapi.FORWARD_SMS_TO_API"
     }
 }

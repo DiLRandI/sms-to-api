@@ -1,4 +1,4 @@
-package com.github.dilrandi.sms_to_api
+package com.github.dilrandi.smstoapi
 
 import android.Manifest
 import android.content.BroadcastReceiver

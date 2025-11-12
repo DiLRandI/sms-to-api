@@ -78,7 +78,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   static const MethodChannel _channel = MethodChannel(
-    'com.github.dilrandi.sms_to_api_service/sms_forwarding',
+    'com.github.dilrandi.smstoapi_service/sms_forwarding',
   );
 
   String _serviceStatus = 'Not Running'; // Initial status
